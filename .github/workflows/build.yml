@@ -79,6 +79,8 @@ jobs:
     name: Publish and Release
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs:
       - windows_x64
       - linux_x64
