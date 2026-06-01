@@ -40,6 +40,38 @@ jobs:
           name: PS3RPD_Windows_x64
           path: dist/PS3RPD_Windows_x64.exe
 
+  windows_arm64:
+    name: Build Windows ARM64
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Setup venv
+        run: python -m venv .venv
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\activate.ps1
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+      - name: Install PyInstaller
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\activate.ps1
+          pip install pyinstaller
+      - name: Build Windows ARM64 executable
+        shell: pwsh
+        run: |
+          .\.venv\Scripts\activate.ps1
+          pyinstaller --onefile --name "PS3RPD_Windows_ARM64" start.py
+      - name: Upload Windows ARM64 artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: PS3RPD_Windows_ARM64
+          path: dist/PS3RPD_Windows_ARM64.exe
+
   linux_x64:
     name: Build Linux x64
     runs-on: ubuntu-latest
@@ -75,6 +107,103 @@ jobs:
           name: PS3RPD_Linux_x64
           path: dist/PS3RPD_Linux_x64
 
+  linux_arm64:
+    name: Build Linux ARM64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build on ARM64 using arm-runner
+        uses: pguyot/arm-runner-action@v2
+        with:
+          base_image: raspios_lite_arm64:latest
+          cpu: cortex-a53
+          cpu_info: cpuinfo/raspberrypi_4b
+          bind_mount_repository: true
+          commands: |
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends python3 python3-venv python3-full
+            python3 -m venv .venv
+            . .venv/bin/activate
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+            pip install pyinstaller
+            pyinstaller --onefile --name "PS3RPD_Linux_ARM64" start.py
+      - name: Upload Linux ARM64 artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: PS3RPD_Linux_ARM64
+          path: dist/PS3RPD_Linux_ARM64
+
+  macos_x64:
+    name: Build macOS x64
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Cache Python dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: macos-x64-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            macos-x64-pip-
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+      - name: Install PyInstaller
+        run: |
+          source .venv/bin/activate
+          pip install pyinstaller
+      - name: Build macOS x64 executable
+        run: |
+          source .venv/bin/activate
+          pyinstaller --onefile --name "PS3RPD_MacOS_x64" start.py
+      - name: Upload macOS x64 artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: PS3RPD_MacOS_x64
+          path: dist/PS3RPD_MacOS_x64
+
+  macos_arm64:
+    name: Build macOS ARM64
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Cache Python dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: macos-arm64-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            macos-arm64-pip-
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+      - name: Install PyInstaller
+        run: |
+          source .venv/bin/activate
+          pip install pyinstaller
+      - name: Build macOS ARM64 executable
+        run: |
+          source .venv/bin/activate
+          pyinstaller --onefile --name "PS3RPD_MacOS_ARM64" start.py
+      - name: Upload macOS ARM64 artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: PS3RPD_MacOS_ARM64
+          path: dist/PS3RPD_MacOS_ARM64
+
   publish:
     name: Publish and Release
     if: always()
@@ -83,33 +212,61 @@ jobs:
       contents: write
     needs:
       - windows_x64
+      - windows_arm64
       - linux_x64
+      - linux_arm64
+      - macos_x64
+      - macos_arm64
     steps:
       - uses: actions/checkout@v6
-      - name: Download Windows artifact
+      - name: Download Windows x64 artifact
         uses: actions/download-artifact@v8
         with:
           name: PS3RPD_Windows_x64
-          path: windows
+          path: releases
         continue-on-error: true
-      - name: Download Linux artifact
+      - name: Download Windows ARM64 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: PS3RPD_Windows_ARM64
+          path: releases
+        continue-on-error: true
+      - name: Download Linux x64 artifact
         uses: actions/download-artifact@v8
         with:
           name: PS3RPD_Linux_x64
-          path: linux
+          path: releases
         continue-on-error: true
-      - name: Collect artifacts
+      - name: Download Linux ARM64 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: PS3RPD_Linux_ARM64
+          path: releases
+        continue-on-error: true
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: PS3RPD_MacOS_x64
+          path: releases
+        continue-on-error: true
+      - name: Download macOS ARM64 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: PS3RPD_MacOS_ARM64
+          path: releases
+        continue-on-error: true
+      - name: Check for artifacts
+        id: check
         run: |
-          mkdir -p releases
-          [ -d windows ] && mkdir -p releases/windows && cp windows/* releases/windows/ || true
-          [ -d linux ] && mkdir -p releases/linux && cp linux/* releases/linux/ || true
+          if ls releases/* 1> /dev/null 2>&1; then echo "artifact_exists=true" >> $GITHUB_OUTPUT; else echo "artifact_exists=false" >> $GITHUB_OUTPUT; fi
+      - name: List files
+        run: ls -la releases/ || true
       - name: Set release metadata
         run: |
           echo "REPOSITORY_NAME=$(basename $GITHUB_REPOSITORY)" >> $GITHUB_ENV
           echo "DATETIME=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
-      - name: List files
-        run: ls -la releases/windows/ releases/linux/ || true
       - name: Create release
+        if: steps.check.outputs.artifact_exists == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
@@ -118,5 +275,9 @@ jobs:
           generate_release_notes: true
           name: Nightly-${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
           files: |
-            releases/windows/PS3RPD_Windows_x64.exe
-            releases/linux/PS3RPD_Linux_x64
+            releases/PS3RPD_Windows_x64.exe
+            releases/PS3RPD_Windows_ARM64.exe
+            releases/PS3RPD_Linux_x64
+            releases/PS3RPD_Linux_ARM64
+            releases/PS3RPD_MacOS_x64
+            releases/PS3RPD_MacOS_ARM64
