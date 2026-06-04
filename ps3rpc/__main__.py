@@ -62,6 +62,13 @@ def main():
                 sleep(prepWork.config["wait_seconds"])
                 continue
 
+            if gatherDetails.isRetroGame:
+                playing_on = "Playing PS1/2 on PS3"
+            elif gatherDetails.isInGame:
+                playing_on = "Playing on PS3"
+            else:
+                playing_on = "On XMB"
+
             rpc_kwargs = {
                 "large_image": gatherDetails.image,
                 "large_text": gatherDetails.titleID,
@@ -69,10 +76,11 @@ def main():
             }
             if prepWork.config["use_appname"]:
                 rpc_kwargs["details"] = gatherDetails.name
-                rpc_kwargs["state"] = gatherDetails.thermalData
+                rpc_kwargs["state"] = gatherDetails.thermalData or playing_on
             else:
                 rpc_kwargs["name"] = gatherDetails.name
                 rpc_kwargs["details"] = gatherDetails.thermalData
+                rpc_kwargs["state"] = playing_on
 
             try:
                 prepWork.RPC.update(**rpc_kwargs)
