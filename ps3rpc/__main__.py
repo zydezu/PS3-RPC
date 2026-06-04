@@ -1,9 +1,9 @@
 import re
 from time import sleep, time
 
-from pypresence import InvalidPipe, InvalidID, ServerError
+from pypresence import InvalidID, InvalidPipe, ServerError
 
-from ps3rpc.config import PrepWork, headers, _THERMAL_RE
+from ps3rpc.config import _THERMAL_RE, PrepWork, headers
 from ps3rpc.scraper import GatherDetails
 
 
@@ -79,13 +79,15 @@ def main():
                 "large_text": large_text,
                 "start": timer,
             }
-            temp_line = gatherDetails.thermalData if prepWork.config["show_temp"] else None
+            temp_line = (
+                gatherDetails.thermalData if prepWork.config["show_temp"] else None
+            )
             if prepWork.config["use_appname"]:
                 rpc_kwargs["details"] = gatherDetails.name
                 rpc_kwargs["state"] = temp_line or playing_on
             else:
                 rpc_kwargs["name"] = gatherDetails.name
-                rpc_kwargs["details"] = temp_line or gatherDetails.name
+                rpc_kwargs["details"] = temp_line
                 rpc_kwargs["state"] = playing_on
 
             try:
@@ -95,7 +97,9 @@ def main():
                 prepWork.connect_to_discord()
             except ServerError as e:
                 print(f"Discord rejected the RPC update: {e}")
-                print("If you have more than one instance of PS3-RPC running, please close the others.")
+                print(
+                    "If you have more than one instance of PS3-RPC running, please close the others."
+                )
 
             sleep(prepWork.config["wait_seconds"])
 

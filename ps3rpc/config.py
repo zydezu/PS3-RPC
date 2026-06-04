@@ -17,7 +17,6 @@ default_config = {
     "wait_seconds": 30,
     "show_temp": False,
     "retro_covers": False,
-    "show_elapsed": True,
     "hibernate_seconds": 600,
     "ip_prompt": True,
     "show_timer": True,
