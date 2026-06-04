@@ -1,4 +1,4 @@
-# PS3-Rich-Presence-for-Discord
+# PS3-RPC
 Discord Rich Presence script for PS3 consoles on HFW&HEN or CFW.
 
 Display what game you are playing on PS3 via your PC!

@@ -7,7 +7,7 @@ from time import sleep
 import networkscan
 import requests
 from bs4 import BeautifulSoup
-from pypresence import DiscordNotFound
+from pypresence import DiscordNotFound, InvalidPipe
 from pypresence.presence import Presence
 from requests.exceptions import ConnectionError
 
@@ -156,6 +156,8 @@ class PrepWork:
                 self.RPC.connect()
                 print("Connected to Discord client")
                 break
-            except DiscordNotFound as e:
-                print(f'could not find Discord client running. "{e}"')
+            except (DiscordNotFound, InvalidPipe) as e:
+                print(f'Could not connect to Discord: "{e}"')
+                print("Ensure Discord is running. If PS3-RPC is a systemd service, "
+                      "Discord must be running in the same user session.")
                 sleep(20)

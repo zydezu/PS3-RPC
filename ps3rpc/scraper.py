@@ -95,7 +95,7 @@ class GatherDetails:
         titleID = title_tag.get_text(strip=True)
         name = name_tag.get_text(strip=True)
         name = _VERSION_RE.sub("", name) if _VERSION_RE.search(name) else name
-        self.name = name
+        self.name = name or titleID
         self.titleID = titleID
         print(f"get_PS3_details():  {titleID} | {name}")
         if self._prev_title != titleID:
@@ -142,7 +142,7 @@ class GatherDetails:
             return self.titleID.lower()
         url = f"https://art.gametdb.com/ps3/cover/{region_code}/{self.titleID}.jpg"
         try:
-            resp = self.session.get(url, headers={"User-Agent": "PS3RPC/1.9.7"})
+            resp = self.session.get(url, headers={"User-Agent": "PS3RPC/2.0.1"})
             if resp.status_code == 200:
                 print("using GameTDB")
                 return url

@@ -1,7 +1,7 @@
 import re
 from time import sleep, time
 
-from pypresence import InvalidPipe, InvalidID
+from pypresence import InvalidPipe, InvalidID, ServerError
 
 from ps3rpc.config import PrepWork, headers, _THERMAL_RE
 from ps3rpc.scraper import GatherDetails
@@ -79,6 +79,9 @@ def main():
             except (InvalidPipe, InvalidID):
                 prepWork.RPC.close()
                 prepWork.connect_to_discord()
+            except ServerError as e:
+                print(f"Discord rejected the RPC update: {e}")
+                print("If you have more than one instance of PS3-RPC running, please close the others.")
 
             sleep(prepWork.config["wait_seconds"])
 
