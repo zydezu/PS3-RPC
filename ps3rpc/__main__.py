@@ -15,7 +15,7 @@ def main():
     gatherDetails = GatherDetails(prepWork)
     timer = None
     if prepWork.config["show_timer"]:
-        timer = time()
+        timer = int(time())
 
     if not prepWork.config["ip"]:
         exit("script failed to execute critical functions.")
@@ -42,7 +42,7 @@ def main():
             print("")
             if closed:
                 prepWork.connect_to_discord()
-                timer = time()
+                timer = int(time())
                 closed = False
 
             if prepWork.config["show_temp"] or prepWork.config["temp_on_tooltip"]:
@@ -85,7 +85,7 @@ def main():
                 rpc_kwargs["state"] = temp_line or playing_on
             else:
                 rpc_kwargs["name"] = gatherDetails.name
-                rpc_kwargs["details"] = temp_line
+                rpc_kwargs["details"] = temp_line or gatherDetails.name
                 rpc_kwargs["state"] = playing_on
 
             try:
