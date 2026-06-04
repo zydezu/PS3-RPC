@@ -45,7 +45,7 @@ def main():
                 timer = time()
                 closed = False
 
-            if prepWork.config["show_temp"]:
+            if prepWork.config["show_temp"] or prepWork.config["temp_on_tooltip"]:
                 gatherDetails.get_thermals()
                 if gatherDetails.thermalData:
                     gatherDetails.thermalData = _THERMAL_RE.sub(
@@ -63,15 +63,20 @@ def main():
                 continue
 
             if gatherDetails.isRetroGame:
-                playing_on = "Playing PS1/2 on PS3"
+                playing_on = "Playing PS1/2 on PlayStation®3 system"
             elif gatherDetails.isInGame:
-                playing_on = "Playing on PS3"
+                playing_on = "Playing on PlayStation®3 system"
             else:
-                playing_on = "On XMB"
+                playing_on = "On PlayStation®3 XMB"
+
+            if prepWork.config["temp_on_tooltip"]:
+                large_text = gatherDetails.thermalData or gatherDetails.titleID
+            else:
+                large_text = gatherDetails.titleID
 
             rpc_kwargs = {
                 "large_image": gatherDetails.image,
-                "large_text": gatherDetails.titleID,
+                "large_text": large_text,
                 "start": timer,
             }
             if prepWork.config["use_appname"]:

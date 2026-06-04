@@ -13,9 +13,9 @@ from requests.exceptions import ConnectionError
 
 default_config = {
     "ip": "",
-    "client_id": 780389261870235650,
+    "client_id": 1512043386327007253,
     "wait_seconds": 30,
-    "show_temp": True,
+    "show_temp": False,
     "retro_covers": False,
     "show_elapsed": True,
     "hibernate_seconds": 600,
@@ -24,6 +24,7 @@ default_config = {
     "prefer_dev_app": False,
     "use_appname": False,
     "show_only_in_game": True,
+    "temp_on_tooltip": True,
 }
 
 headers = {"User-Agent": "Mozilla/5.0"}
@@ -159,6 +160,8 @@ class PrepWork:
                 break
             except (DiscordNotFound, InvalidPipe) as e:
                 print(f'Could not connect to Discord: "{e}"')
-                print("Ensure Discord is running. If PS3-RPC is a systemd service, "
-                      "Discord must be running in the same user session.")
+                print(
+                    "Ensure Discord is running. If PS3-RPC is a systemd service, "
+                    "Discord must be running in the same user session."
+                )
                 sleep(20)
