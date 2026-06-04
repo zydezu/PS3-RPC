@@ -158,7 +158,7 @@ class PrepWork:
                 self.RPC.connect()
                 print("Connected to Discord client")
                 break
-            except (DiscordNotFound, InvalidPipe) as e:
+            except (DiscordNotFound, InvalidPipe, ConnectionRefusedError) as e:
                 print(f'Could not connect to Discord: "{e}"')
                 print(
                     "Ensure Discord is running. If PS3-RPC is a systemd service, "
