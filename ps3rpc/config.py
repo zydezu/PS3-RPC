@@ -105,7 +105,7 @@ def _arrow_select(prompt, options):
 
 
 class PrepWork:
-    config_path = Path("ps3rpcconfig.txt")
+    config_path = Path("ps3rpcconfig.json")
 
     def __init__(self):
         self.RPC = None
