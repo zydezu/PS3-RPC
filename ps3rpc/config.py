@@ -128,15 +128,11 @@ class PrepWork:
                 self.config = default_config
                 self.prompt_user()
                 return
-            if not all(k in self.config for k in default_config):
-                print(
-                    f"Config file {self.config_path} is corrupted, "
-                    "resetting to defaults."
-                )
-                self.config_path.unlink()
-                self.config = default_config
-                self.prompt_user()
-                return
+            missing = {k: v for k, v in default_config.items() if k not in self.config}
+            if missing:
+                self.config.update(missing)
+                self.save_config(self.config["ip"])
+                print(f"Config updated with {len(missing)} new default(s): {', '.join(missing)}")
             self.config["wait_seconds"] = max(15, self.config["wait_seconds"])
             if not self.test_for_webman(self.config["ip"]) and self.config["ip_prompt"]:
                 print("PS3 cannot be reached via the IP saved in the config file.")

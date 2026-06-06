@@ -51,17 +51,28 @@ def main():
     gd._prev_title = ""
     gd.get_PS3_image()
 
+    if prep.config["show_temp"] or prep.config["temp_on_tooltip"]:
+        gd.thermalData = "CPU 65°C | RSX 70°C"
+
     timer = int(time())
-    playing_on = "Playing on PlayStation®3 system"
+    console = "PS3" if prep.config["short_console_name"] else "PlayStation®3 system"
+    playing_on = f"Playing on {console}"
+
+    large_text = gd.thermalData if prep.config["temp_on_tooltip"] else gd.titleID
+    temp_line = gd.thermalData if prep.config["show_temp"] else None
 
     rpc_kwargs = {
-        "name": GAME_NAME,
-        "details": None,
-        "state": playing_on,
         "large_image": gd.image,
-        "large_text": TITLE_ID,
+        "large_text": large_text or gd.titleID,
         "start": timer,
     }
+    if prep.config["use_appname"]:
+        rpc_kwargs["details"] = gd.name
+        rpc_kwargs["state"] = temp_line or playing_on
+    else:
+        rpc_kwargs["name"] = gd.name
+        rpc_kwargs["details"] = temp_line
+        rpc_kwargs["state"] = playing_on
 
     print(f"\nSetting presence: {GAME_NAME} ({TITLE_ID})")
     print(f"  large_image: {gd.image}")
