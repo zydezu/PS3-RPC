@@ -5,7 +5,7 @@ A program to display what game you're playing on homebrewed PS3 via your PC!
 
 ## Display Examples
 
-| | |
+| Option | Image |
 |---|---|
 | Default | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default2.png?raw=true"> |
 | `short_console_name: False` | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default.png?raw=true"> |
