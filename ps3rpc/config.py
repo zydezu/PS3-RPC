@@ -132,7 +132,9 @@ class PrepWork:
             if missing:
                 self.config.update(missing)
                 self.save_config(self.config["ip"])
-                print(f"Config updated with {len(missing)} new default(s): {', '.join(missing)}")
+                print(
+                    f"Config updated with {len(missing)} new default(s): {', '.join(missing)}"
+                )
             self.config["wait_seconds"] = max(15, self.config["wait_seconds"])
             if not self.test_for_webman(self.config["ip"]) and self.config["ip_prompt"]:
                 print("PS3 cannot be reached via the IP saved in the config file.")
@@ -193,7 +195,7 @@ class PrepWork:
                     return
 
             if attempt < max_retries:
-                print(f"PS3 not found. Retrying in 20 seconds...")
+                print("PS3 not found. Retrying in 20 seconds...")
                 sleep(10)
 
         print(f"PS3 not found after {max_retries} scan attempts.")
