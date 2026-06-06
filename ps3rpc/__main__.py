@@ -1,9 +1,8 @@
-import re
 from time import sleep, time
 
 from pypresence import InvalidID, InvalidPipe, ServerError
 
-from ps3rpc.config import _THERMAL_RE, PrepWork, headers
+from ps3rpc.config import _THERMAL_RE, PrepWork
 from ps3rpc.scraper import GatherDetails
 
 
@@ -62,7 +61,11 @@ def main():
                 sleep(prepWork.config["wait_seconds"])
                 continue
 
-            console = "PS3" if prepWork.config["short_console_name"] else "PlayStation®3 system"
+            console = (
+                "PS3"
+                if prepWork.config["short_console_name"]
+                else "PlayStation®3 system"
+            )
             if gatherDetails.isRetroGame:
                 playing_on = f"Playing PS1/2 on {console}"
             elif gatherDetails.isInGame:

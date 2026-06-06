@@ -1,12 +1,13 @@
 # PS3-RPC
-Discord Rich Presence script for PS3 consoles on HFW&HEN or CFW.
+A program to display what game you're playing on homebrewed PS3 via your PC!
 
-Display what game you are playing on PS3 via your PC!
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/boysaremoe) [![pypresence](https://img.shields.io/badge/using-pypresence-00bb88.svg?style=for-the-badge&logo=discord&logoWidth=20)](https://github.com/qwertyquerty/pypresence)
 
-## Display Example
-<img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default.png?raw=true">
-<img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default2.png?raw=true">
-<img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default3.png?raw=true">
+## Display Examples
+
+| Default | `short_console_name: False` | `show_temp: True` |
+|:-:|:-:|:-:|
+| <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default2.png?raw=true"> | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default.png?raw=true"> | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default3.png?raw=true"> |
 
 
 ## Usage
@@ -20,9 +21,7 @@ Display what game you are playing on PS3 via your PC!
 * A Python 3.9 interpreter installed on the PC if you aren't using the .exe
 
 ### Windows
-* [version 1.9.7 .exe](https://github.com/zorua98741/PS3-Rich-Presence-for-Discord/releases/download/v1.9.7/PS3RPC.exe)
-or
-* [version 1.9.7 .py](https://github.com/zorua98741/PS3-Rich-Presence-for-Discord/releases/download/v1.9.7/PS3RPC.py)
+* Download the `PS3RPC_Windows_*.exe` from the [latest release](https://github.com/zydezu/PS3-RPC/releases/latest), x64 for 64-bit device or ARM64 for an ARM64 device
 
 #### Installing as a Windows service (optional)
 Download [NSSM](https://nssm.cc/release/nssm-2.24.zip) and run `nssm install <service name ie. ps3rpc>` to install PS3RPC as a Windows service.
@@ -34,16 +33,19 @@ WARNING: PS3RPC.exe must be in a location that won't change ie. C:\ps3rpc\PS3RPC
 
 ### Linux 
 
-To download and run the script for the first time:
+* Download the `PS3RPC_Linux_*` from the [latest release](https://github.com/zydezu/PS3-RPC/releases/latest), x64 for a 64-bit system or ARM64 if you're using an ARM system (like a Raspberry Pi).
+
+You can also download and run script manually, like this:
 ```bash
 # Clone the GitHub repository under the user folder
-git clone https://github.com/zorua98741/PS3-Rich-Presence-for-Discord ~/ps3-rich-presence
+git clone https://github.com/zydezu/PS3-RPC ~/PS3-RPC
 # Run the start script
-cd ~/ps3-rich-presence && ./start.py
+cd ~/PS3-RPC && ./start.py
 ```
 
-From there you can run the script via double clicking on the file within your file explorer, and clicking on "Run (in terminal)".<br>
-Alternatively, you can run the command via the terminal by running `cd ~/ps3-rich-presence && ./start.py` again.
+From there you can run the script via double clicking on the file within your file explorer, and clicking on "Run (in terminal)".
+
+Alternatively, you can run the command via the terminal by running `cd ~/PS3-RPC && ./start.py` again.
 
 #### Installing as a systemd service (optional)
 <details>
@@ -63,27 +65,27 @@ PATH=${HOME}/.local/bin:
 # Creates a systemd .service file in the user service folder that runs the script
 bash -c 'echo "
 [Unit]
-Description=Enables Discord Rich Presence for PS3
+Description=Enables PS3-RPC
 Wants=network-online.target
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 $HOME/ps3-rich-presence/start.py
+ExecStart=/usr/bin/python3 $HOME/PS3-RPC/start.py
 Restart=on-failure
 StandardOutput=journal
 StandardError=journal
-WorkingDirectory=$HOME/ps3-rich-presence
+WorkingDirectory=$HOME/PS3-RPC
 
 [Install]
 WantedBy=default.target
-" > ~/.config/systemd/user/ps3rpc.service'
+" > ~/.config/systemd/user/PS3-RPC.service'
 # Reloads the systemd service to recognize the new service
 systemctl --user daemon-reload
 # Enables the service and starts it
-systemctl --user enable --now ps3rpc
+systemctl --user enable --now PS3-RPC
 # Make it clear that something happened
-echo "Finished adding user service for ps3rpc."
-echo "You can check the status of the service with `systemctl --user status ps3rpc`"
+echo "Finished adding user service for PS3-RPC."
+echo "You can check the status of the service with `systemctl --user status PS3-RPC`"
 ```
 
 In order to check the health of the service, you can run `systemctl --user status ps3rpc`<br>
@@ -103,16 +105,23 @@ For more depth logs you can use `journalctl --user -xeu ps3rpc`
 This script can utilise images provided by [GameTDB](https://www.gametdb.com/), if you are able, consider supporting the service.
 
 ### External config file
-PS3RPC makes use of an external config file named `ps3rpcconfig.json` to persistently store a few variables. 
+PS3-RPC makes use of an external config file named `ps3rpcconfig.json` to store settings. 
 
-On creation, the default values will be:
-* Your PS3's IP address (where the script will find your PS3 on the network)
-* My Discord developer application's ID (where the script will send presence data to)
-* A refresh time of 30 seconds (how often to get new data (minimum value of 15 seconds)
-* To show the PS3's temperature
-* To use a shared cover for PS2&PSX games
-* To display the time elapsed
-* To only show the presence when playing a game
+| Key | Default | Description |
+|---|---|---|
+| `ip` | `""` | Your PS3's IP address |
+| `client_id` | `1512043386327007253` | Discord developer application ID to send presence data to |
+| `wait_seconds` | `30` | How often (in seconds) to refresh presence data (minimum 15) |
+| `show_temp` | `false` | Show PS3 CPU/RSX temperature in the presence |
+| `retro_covers` | `false` | Use game-specific covers for PS1/PS2 games |
+| `hibernate_seconds` | `600` | How long (in seconds) to wait before retrying when PS3 is unreachable |
+| `ip_prompt` | `true` | Re-prompt for IP if the PS3 can't be reached on startup |
+| `show_timer` | `true` | Display time elapsed in the presence |
+| `prefer_dev_app` | `false` | Use Discord dev app images instead of GameTDB covers |
+| `use_appname` | `false` | Show game name as the activity details line instead of the app name |
+| `short_console_name` | `true` | Show "PS3" instead of "PlayStation®3 system" in the presence |
+| `show_only_in_game` | `true` | Only update presence when a game is running (hide on XMB) |
+| `temp_on_tooltip` | `true` | Show temperature when hovering over the large image in the activity |
 
 ### Using your own images
 If you'd like to control what images are used for each game, you must create a Discord Developer Application over at the [Discord Developer Portal](https://discord.com/developers/applications).
@@ -120,5 +129,3 @@ If you'd like to control what images are used for each game, you must create a D
 Once created, copy the application ID from the Developer Portal and paste it into the external `ps3rpcconfig.json`, replacing the value of `client_id`.
 
 You are now able to upload your own assets in the Developer Portal under `Rich Presence > Art Assets`. Note that the name of the asset uploaded must be the lowercase title ID provided in the script's output. (e.g. `abcd12345`)
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/N4N87V7K5) [![pypresence](https://img.shields.io/badge/using-pypresence-00bb88.svg?style=for-the-badge&logo=discord&logoWidth=20)](https://github.com/qwertyquerty/pypresence)
