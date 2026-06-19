@@ -40,7 +40,7 @@ WARNING: PS3RPC.exe must be in a location that won't change ie. C:\ps3rpc\PS3RPC
 You can also download and run script manually, like this:
 ```bash
 # Clone the GitHub repository under the user folder
-git clone https://github.com/zydezu/PS3-RPC ~/PS3-RPC
+git clone https://github.com/zydezu/PS3-RPC
 # Run the start script
 cd ~/PS3-RPC && ./start.py
 ```
