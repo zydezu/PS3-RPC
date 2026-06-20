@@ -2,14 +2,21 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.4.9)"
+        required: true
+      changelog:
+        description: "Release notes / changelog"
+        required: false
 
 jobs:
   windows_x64:
     name: Build Windows x64
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Setup venv
@@ -31,7 +38,7 @@ jobs:
           .\.venv\Scripts\activate.ps1
           pyinstaller --onefile --name "PS3RPC_Windows_x64" start.py
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: PS3RPC_Windows_x64
           path: dist/PS3RPC_Windows_x64.exe
@@ -40,8 +47,8 @@ jobs:
     name: Build Windows ARM64
     runs-on: windows-11-arm
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Setup venv
@@ -63,7 +70,7 @@ jobs:
           .\.venv\Scripts\activate.ps1
           pyinstaller --onefile --name "PS3RPC_Windows_ARM64" start.py
       - name: Upload Windows ARM64 artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: PS3RPC_Windows_ARM64
           path: dist/PS3RPC_Windows_ARM64.exe
@@ -72,12 +79,12 @@ jobs:
     name: Build Linux x64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Cache Python dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
@@ -98,7 +105,7 @@ jobs:
           source .venv/bin/activate
           pyinstaller --onefile --name "PS3RPC_Linux_x64" start.py
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: PS3RPC_Linux_x64
           path: dist/PS3RPC_Linux_x64
@@ -107,7 +114,7 @@ jobs:
     name: Build Linux ARM64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Build on ARM64 using arm-runner
         uses: pguyot/arm-runner-action@v2
         with:
@@ -125,7 +132,7 @@ jobs:
             pip install pyinstaller
             pyinstaller --onefile --name "PS3RPC_Linux_ARM64" start.py
       - name: Upload Linux ARM64 artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: PS3RPC_Linux_ARM64
           path: dist/PS3RPC_Linux_ARM64
@@ -134,12 +141,12 @@ jobs:
     name: Build macOS x64
     runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Cache Python dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: macos-x64-pip-${{ hashFiles('requirements.txt') }}
@@ -160,7 +167,7 @@ jobs:
           source .venv/bin/activate
           pyinstaller --onefile --name "PS3RPC_MacOS_x64" start.py
       - name: Upload macOS x64 artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: PS3RPC_MacOS_x64
           path: dist/PS3RPC_MacOS_x64
@@ -169,12 +176,12 @@ jobs:
     name: Build macOS ARM64
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - name: Cache Python dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: macos-arm64-pip-${{ hashFiles('requirements.txt') }}
@@ -195,7 +202,7 @@ jobs:
           source .venv/bin/activate
           pyinstaller --onefile --name "PS3RPC_MacOS_ARM64" start.py
       - name: Upload macOS ARM64 artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: PS3RPC_MacOS_ARM64
           path: dist/PS3RPC_MacOS_ARM64
@@ -214,25 +221,21 @@ jobs:
       - macos_x64
       - macos_arm64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: releases
       - name: List files
         run: ls -la releases/*/ || true
-      - name: Set release metadata
-        run: |
-          echo "REPOSITORY_NAME=$(basename $GITHUB_REPOSITORY)" >> $GITHUB_ENV
-          echo "DATETIME=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
       - name: Create release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }}
+          body: ${{ github.event.inputs.changelog }}
           draft: false
-          prerelease: true
-          generate_release_notes: true
-          name: Release-${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
+          prerelease: false
           files: |
             releases/PS3RPC_Windows_x64/PS3RPC_Windows_x64.exe
             releases/PS3RPC_Windows_ARM64/PS3RPC_Windows_ARM64.exe
