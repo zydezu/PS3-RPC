@@ -1,10 +1,6 @@
-name: Build
+name: Release
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -204,3 +200,43 @@ jobs:
           name: PS3RPC_MacOS_ARM64
           path: dist/PS3RPC_MacOS_ARM64
 
+  release:
+    name: Create Release
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs:
+      - windows_x64
+      - windows_arm64
+      - linux_x64
+      - linux_arm64
+      - macos_x64
+      - macos_arm64
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: releases
+      - name: List files
+        run: ls -la releases/*/ || true
+      - name: Set release metadata
+        run: |
+          echo "REPOSITORY_NAME=$(basename $GITHUB_REPOSITORY)" >> $GITHUB_ENV
+          echo "DATETIME=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+          name: Release-${{ env.REPOSITORY_NAME }}-${{ env.DATETIME }}
+          files: |
+            releases/PS3RPC_Windows_x64/PS3RPC_Windows_x64.exe
+            releases/PS3RPC_Windows_ARM64/PS3RPC_Windows_ARM64.exe
+            releases/PS3RPC_Linux_x64/PS3RPC_Linux_x64
+            releases/PS3RPC_Linux_ARM64/PS3RPC_Linux_ARM64
+            releases/PS3RPC_MacOS_x64/PS3RPC_MacOS_x64
+            releases/PS3RPC_MacOS_ARM64/PS3RPC_MacOS_ARM64
