@@ -9,6 +9,15 @@ on:
       changelog:
         description: "Release notes / changelog"
         required: false
+      release_type:
+        description: "Release type"
+        required: true
+        type: choice
+        default: draft
+        options:
+          - draft
+          - prerelease
+          - release
 
 jobs:
   windows_x64:
