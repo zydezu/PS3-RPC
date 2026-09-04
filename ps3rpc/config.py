@@ -12,6 +12,8 @@ from bs4 import BeautifulSoup
 from pypresence import DiscordNotFound, InvalidPipe
 from pypresence.presence import Presence
 
+from ps3rpc.ui import C, clear, err, ok, warn
+
 default_config = {
     "ip": "",
     "client_id": 1512043386327007253,
@@ -22,6 +24,7 @@ default_config = {
     "ip_prompt": True,
     "show_timer": True,
     "prefer_dev_app": False,
+    "use_icon0": True,
     "use_appname": False,
     "short_console_name": True,
     "show_only_in_game": True,
@@ -41,14 +44,55 @@ _IPV4_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
 SEPARATOR = "=" * 25 + "\n"
 
 
+def _read_key():
+    """Block for one keypress. Returns 'up' / 'down' / 'space' / 'enter' / None."""
+    if sys.platform == "win32":
+        import msvcrt
+
+        ch = msvcrt.getwch()
+        if ch == "\xe0":
+            return {"H": "up", "P": "down"}.get(msvcrt.getwch())
+        if ch == " ":
+            return "space"
+        if ch in ("\r", "\n"):
+            return "enter"
+        if ch == "\x03":
+            raise KeyboardInterrupt
+        return None
+
+    import termios
+    import tty
+
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+        if ch == "\x1b":
+            if sys.stdin.read(1) == "[":
+                return {"A": "up", "B": "down"}.get(sys.stdin.read(1))
+            return None
+        if ch == " ":
+            return "space"
+        if ch in ("\r", "\n"):
+            return "enter"
+        if ch == "\x03":
+            raise KeyboardInterrupt
+        return None
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
 def _arrow_select(prompt, options):
     """Arrow-key selection menu. Returns the index of the chosen option."""
     selected = 0
 
     def render():
         for i, opt in enumerate(options):
-            marker = "> " if i == selected else "  "
-            sys.stdout.write(f"  {marker}{opt}\r\n")
+            if i == selected:
+                sys.stdout.write(f"  {C.YELLOW}{C.BOLD}> {opt}{C.RESET}\r\n")
+            else:
+                sys.stdout.write(f"    {C.GRAY}{opt}{C.RESET}\r\n")
         sys.stdout.flush()
 
     def move_up():
@@ -57,53 +101,58 @@ def _arrow_select(prompt, options):
 
     print(prompt)
     render()
+    while True:
+        key = _read_key()
+        if key == "up":
+            selected = (selected - 1) % len(options)
+        elif key == "down":
+            selected = (selected + 1) % len(options)
+        elif key == "enter":
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
+            return selected
+        else:
+            continue
+        move_up()
+        render()
 
-    if sys.platform == "win32":
-        import msvcrt
 
-        while True:
-            ch = msvcrt.getwch()
-            if ch == "\xe0":
-                ch2 = msvcrt.getwch()
-                if ch2 == "H":
-                    selected = (selected - 1) % len(options)
-                elif ch2 == "P":
-                    selected = (selected + 1) % len(options)
-            elif ch in ("\r", "\n"):
-                sys.stdout.write("\n")
-                sys.stdout.flush()
-                return selected
-            move_up()
-            render()
-    else:
-        import termios
-        import tty
+def _toggle_select(prompt, items, values):
+    """Checklist menu"""
+    selected = 0
 
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            while True:
-                ch = sys.stdin.read(1)
-                if ch == "\x1b":
-                    ch = sys.stdin.read(1)
-                    if ch == "[":
-                        ch = sys.stdin.read(1)
-                        if ch == "A":
-                            selected = (selected - 1) % len(options)
-                        elif ch == "B":
-                            selected = (selected + 1) % len(options)
-                elif ch in ("\r", "\n"):
-                    break
-                elif ch == "\x03":
-                    raise KeyboardInterrupt
-                move_up()
-                render()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
-        sys.stdout.write("\r\n")
+    def render():
+        for i, (key, label) in enumerate(items):
+            box = f"{C.GREEN}[x]{C.RESET}" if values[key] else f"{C.GRAY}[ ]{C.RESET}"
+            if i == selected:
+                sys.stdout.write(f"  {C.YELLOW}{C.BOLD}>{C.RESET} {box} {label}\r\n")
+            else:
+                sys.stdout.write(f"    {box} {C.GRAY}{label}{C.RESET}\r\n")
         sys.stdout.flush()
-        return selected
+
+    def move_up():
+        sys.stdout.write(f"\033[{len(items)}A")
+        sys.stdout.flush()
+
+    print(prompt)
+    render()
+    while True:
+        key = _read_key()
+        if key == "up":
+            selected = (selected - 1) % len(items)
+        elif key == "down":
+            selected = (selected + 1) % len(items)
+        elif key == "space":
+            item_key = items[selected][0]
+            values[item_key] = not values[item_key]
+        elif key == "enter":
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
+            return values
+        else:
+            continue
+        move_up()
+        render()
 
 
 def _page_is_webman(html):
@@ -138,13 +187,13 @@ class PrepWork:
                 with self.config_path.open(mode="r") as f:
                     self.config = json.load(f)
             except json.JSONDecodeError:
-                print(
-                    f"Config file {self.config_path} is corrupted, "
-                    "resetting to defaults."
+                warn(
+                    f"Config file {self.config_path} is corrupted, resetting to defaults."
                 )
                 self.config_path.unlink()
                 self.config = default_config.copy()
                 self.prompt_user()
+                self.configure_options()
                 return
             missing = {k: v for k, v in default_config.items() if k not in self.config}
             if missing:
@@ -156,26 +205,30 @@ class PrepWork:
             self.config["wait_seconds"] = max(15, self.config["wait_seconds"])
             saved_ip = str(self.config.get("ip") or "").strip()
             if not saved_ip:
-                print("No PS3 IP address is saved yet.")
+                warn("No PS3 IP address is saved yet.")
                 self.prompt_user()
             elif self.config["ip_prompt"] and not self.test_for_webman(saved_ip):
-                print(f'PS3 cannot be reached at the saved IP address "{saved_ip}".')
+                err(f'PS3 cannot be reached at the saved IP address "{saved_ip}".')
                 self.prompt_user()
         else:
             self.config = default_config.copy()
             print(
-                f"No config file found — a new one will be saved to {self.config_path}"
+                f"  {C.GRAY}No config file found — a new one will be saved to "
+                f"{self.config_path}{C.RESET}"
             )
             self.prompt_user()
+            self.configure_options()
 
     def prompt_user(self):
-        print("\n===== PS3-RPC Setup =====\n")
+        clear()
+        print(f"\n{C.BOLD}{C.CYAN}===== PS3-RPC Setup ====={C.RESET}\n")
         options = [
             "Automatic — scan network for PS3",
             "Manual   — enter IP address directly",
         ]
         choice = _arrow_select(
-            "How would you like to find your PS3's IP address?\nUse arrow keys to navigate and press enter to select an option.\n",
+            f"{C.BOLD}How would you like to find your PS3's IP address?{C.RESET}\n"
+            f"{C.GRAY}Use arrow keys to navigate and press enter to select an option.{C.RESET}\n",
             options,
         )
         print(SEPARATOR)
@@ -183,6 +236,46 @@ class PrepWork:
             self.grab_host_network()
         else:
             self.get_IP_from_user()
+
+    # Options shown on the first-run toggle screen.
+    _TOGGLE_OPTIONS = [
+        ("show_temp", "Show PS3 CPU/RSX temperature in the presence"),
+        ("retro_covers", "Use game-specific covers for PS1/PS2 games"),
+        ("ip_prompt", "Re-prompt for IP if the PS3 can't be reached on startup"),
+        ("show_timer", "Display time elapsed in the presence"),
+        ("prefer_dev_app", "Use Discord dev app images instead of GameTDB covers"),
+        ("use_icon0", "Use the game's own ICON0.PNG instead of GameTDB/dev app covers"),
+        (
+            "use_appname",
+            "Show game name as the activity details line instead of the app name",
+        ),
+        ("short_console_name", 'Show "PS3" instead of "PlayStation®3 system"'),
+        (
+            "show_only_in_game",
+            "Only update presence when a game is running (hide on XMB)",
+        ),
+        ("temp_on_tooltip", "Show temperature when hovering over the large image"),
+    ]
+
+    def configure_options(self):
+        """Let the user toggle the boolean config options before starting."""
+        clear()
+        print(f"\n{C.BOLD}{C.CYAN}===== First-time Setup: Options ====={C.RESET}\n")
+        values = {
+            key: bool(self.config.get(key, default_config[key]))
+            for key, _ in self._TOGGLE_OPTIONS
+        }
+        values = _toggle_select(
+            f"{C.BOLD}View and toggle any options below, then press enter to continue.{C.RESET}\n"
+            f"{C.GRAY}Use arrow keys to navigate, "
+            f"{C.WHITE}{C.BOLD}space{C.RESET}{C.GRAY} to toggle, "
+            f"{C.WHITE}{C.BOLD}enter{C.RESET}{C.GRAY} to confirm.{C.RESET}\n",
+            self._TOGGLE_OPTIONS,
+            values,
+        )
+        self.config.update(values)
+        self.save_config(self.config["ip"])
+        print(SEPARATOR)
 
     def grab_host_network(self):
         host_ip = None
@@ -192,19 +285,22 @@ class PrepWork:
             host_ip = tempSock.getsockname()[0]
             tempSock.close()
         except Exception as e:
-            print(f'Error while getting host network: "{e}"')
+            err(f'Error while getting host network: "{e}"')
 
         if host_ip is not None:
             self.scan_network(host_ip)
         else:
-            print("Could not determine host network. Falling back to manual entry.")
+            warn("Could not determine host network. Falling back to manual entry.")
             self.get_IP_from_user()
 
-    def scan_network(self, host_ip, timeout=1.5, workers=64):
+    def scan_network(self, host_ip, timeout=2.5, workers=64):
         # every address in the range is HTTP-probed
         network = ipaddress.ip_network(f"{host_ip}/24", strict=False)
         targets = [str(ip) for ip in network.hosts() if str(ip) != host_ip]
-        print(f"Scanning {network} for webMAN ({len(targets)} addresses...")
+        print(
+            f"  {C.GRAY}Scanning {network} for webMAN "
+            f"({len(targets)} addresses)...{C.RESET}"
+        )
 
         found = None
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -218,49 +314,50 @@ class PrepWork:
                     break
 
         if found:
-            print(f'PS3 found at "{found}".')
+            ok(f'PS3 found at "{found}".')
             self.save_config(found)
             return
 
-        print("No webMAN instance found on the network.")
-        print("Falling back to manual IP entry.")
+        warn("No webMAN instance found on the network.")
+        print(f"  {C.GRAY}Falling back to manual IP entry.{C.RESET}")
         self.get_IP_from_user()
 
     def get_IP_from_user(self):
         while True:
             ip = input(
-                "Enter your PS3's IP address (for example: 192.168.0.122),\n"
-                "or press Ctrl+C to quit: "
+                f"  {C.BOLD}Enter your PS3's IP address{C.RESET} "
+                f"{C.GRAY}(for example: 192.168.0.122),{C.RESET}\n"
+                f"  {C.GRAY}or press Ctrl+C to quit:{C.RESET} "
             ).strip()
             if not ip:
-                print("No address entered.\n")
+                warn("No address entered.\n")
                 continue
             if _IPV4_RE.match(ip) is None:
-                print(f'"{ip}" does not look like an IPv4 address — trying it anyway.')
+                warn(f'"{ip}" does not look like an IPv4 address — trying it anyway.')
             if self.test_for_webman(ip):
                 self.save_config(ip)
                 break
-            print("Could not connect to PS3 at that address. Please try again.\n")
+            print(f"  {C.GRAY}Please try again.{C.RESET}\n")
 
     def test_for_webman(self, ip, silent=False):
         ip = str(ip or "").strip()
         if not ip:
             if not silent:
-                print("No IP address to test.")
+                err("No IP address to test.")
             return False
         url = f"http://{ip}"
         try:
             response = self.session.get(url, timeout=5)
         except requests.RequestException as e:
             if not silent:
-                print(f'Could not reach a webpage on "{ip}" ({type(e).__name__}).')
+                err(f'Could not reach a webpage on "{ip}" ({type(e).__name__}).')
             return False
         if _page_is_webman(response.text):
             if not silent:
-                print(f'Given IP "{ip}" belongs to webMAN.')
+                ok(f'PS3 IP: "{ip}"')
             return True
         if not silent:
-            print(
+            err(
                 f'webMAN MOD not found on "{ip}". '
                 "Please ensure the PS3 is turned on, has webMAN MOD installed and "
                 "running, and is connected to the same network as the PC."
@@ -277,12 +374,13 @@ class PrepWork:
             try:
                 self.RPC = Presence(self.config["client_id"])
                 self.RPC.connect()
-                print("Connected to Discord client")
+                ok("Successfully connected to Discord client")
                 break
             except (DiscordNotFound, InvalidPipe, ConnectionRefusedError) as e:
-                print(f'Could not connect to Discord: "{e}"')
+                err(f'Could not connect to Discord: "{e}"')
                 print(
-                    "Ensure Discord is running. If PS3-RPC is a systemd service, "
-                    "Discord must be running in the same user session."
+                    f"  {C.GRAY}Ensure Discord is running. If PS3-RPC is a systemd "
+                    f"service, Discord must be running in the same user "
+                    f"session.{C.RESET}"
                 )
                 sleep(20)

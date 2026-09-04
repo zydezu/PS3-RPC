@@ -120,6 +120,7 @@ PS3-RPC makes use of an external config file named `ps3rpcconfig.json` to store 
 | `ip_prompt` | `true` | Re-prompt for IP if the PS3 can't be reached on startup |
 | `show_timer` | `true` | Display time elapsed in the presence |
 | `prefer_dev_app` | `false` | Use Discord dev app images instead of GameTDB covers |
+| `use_icon0` | `true` | Use the game's own `ICON0.PNG` (fetched from the PS3 and re-hosted on [uguu.se](https://uguu.se)) instead of GameTDB/dev app covers |
 | `use_appname` | `false` | Show game name as the activity details line instead of the app name |
 | `short_console_name` | `true` | Show "PS3" instead of "PlayStation®3 system" in the presence |
 | `show_only_in_game` | `true` | Only update presence when a game is running (hide on XMB) |

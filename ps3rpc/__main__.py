@@ -1,9 +1,40 @@
+import contextlib
+import io
 from time import sleep, time
 
 from pypresence import InvalidID, InvalidPipe, ServerError
 
-from ps3rpc.config import _THERMAL_RE, PrepWork
+from ps3rpc.config import _THERMAL_RE, SEPARATOR, PrepWork
 from ps3rpc.scraper import GatherDetails
+from ps3rpc.ui import C, clear, err, warn
+
+_EVENT_MARKERS = ("✓", "✗", "⚠")
+
+
+def _print_header(closed):
+    discord_status = (
+        f"{C.GREEN}●{C.RESET} Connected to Discord"
+        if not closed
+        else f"{C.YELLOW}●{C.RESET} Reconnecting to Discord…"
+    )
+    print(
+        f"{C.BOLD}{C.CYAN}PS3-RPC{C.RESET}  {C.GRAY}(Ctrl+C to stop){C.RESET}"
+        f"   {discord_status}\n"
+    )
+
+
+def _print_gather_output(captured):
+    """Split a chunk of captured scraper output into one-off events"""
+    lines = [line for line in captured.splitlines() if line.strip()]
+    transient = [line for line in lines if any(m in line for m in _EVENT_MARKERS)]
+    steady = [line for line in lines if line not in transient]
+
+    if transient:
+        for line in transient:
+            print(line)
+        print(f"{C.GRAY}{SEPARATOR.rstrip()}{C.RESET}")
+    for line in steady:
+        print(line)
 
 
 def main():
@@ -11,14 +42,16 @@ def main():
     try:
         prepWork.read_config()
     except KeyboardInterrupt:
-        print("\nSetup cancelled — nothing was saved. Exiting.")
+        print()
+        warn("Setup cancelled — nothing was saved. Exiting.")
         return
 
     if not str(prepWork.config.get("ip") or "").strip():
+        print()
+        err("No reachable PS3 was configured, so PS3-RPC can't start.")
         print(
-            "\nNo reachable PS3 was configured, so PS3-RPC can't start.\n"
-            "Re-run once your PS3 is on with webMAN MOD running, or edit the\n"
-            f'"ip" value in {prepWork.config_path} directly.'
+            f"  {C.GRAY}Re-run once your PS3 is on with webMAN MOD running, or edit "
+            f'the "ip" value in {prepWork.config_path} directly.{C.RESET}'
         )
         return
 
@@ -28,7 +61,7 @@ def main():
         timer = int(time()) if prepWork.config["show_timer"] else None
         run_loop(prepWork, gatherDetails, timer)
     except KeyboardInterrupt:
-        print("\nShutting down PS3-RPC.")
+        print(f"\n  {C.GRAY}Shutting down PS3-RPC.{C.RESET}")
         if prepWork.RPC is not None:
             try:
                 prepWork.RPC.clear()
@@ -40,15 +73,20 @@ def main():
 def run_loop(prepWork, gatherDetails, timer):
     closed = False
     while True:
-        if not gatherDetails.get_html():
+        # this is slow!
+        html_ok = gatherDetails.get_html()
+
+        if not html_ok:
+            clear()
+            _print_header(closed)
             if gatherDetails.isRetroGame:
                 print(
-                    f"PS2 game previously mounted, keeping RPC active and "
-                    f"waiting {prepWork.config['wait_seconds']} seconds"
+                    f"  {C.GRAY}PS2 game previously mounted, keeping RPC active and "
+                    f"waiting {prepWork.config['wait_seconds']} seconds{C.RESET}"
                 )
                 sleep(prepWork.config["wait_seconds"])
             else:
-                print(
+                warn(
                     f"PS3 not found on network, closing RPC and hibernating "
                     f"{prepWork.config['hibernate_seconds']} seconds."
                 )
@@ -58,26 +96,35 @@ def run_loop(prepWork, gatherDetails, timer):
                 closed = True
                 sleep(float(prepWork.config["hibernate_seconds"]))
         else:
-            print("")
             if closed:
                 prepWork.connect_to_discord()
                 timer = int(time())
                 closed = False
 
-            if prepWork.config["show_temp"] or prepWork.config["temp_on_tooltip"]:
-                gatherDetails.get_thermals()
-                if gatherDetails.thermalData:
-                    gatherDetails.thermalData = _THERMAL_RE.sub(
-                        "", gatherDetails.thermalData
-                    )
+            gather_buf = io.StringIO()
+            with contextlib.redirect_stdout(gather_buf):
+                if prepWork.config["show_temp"] or prepWork.config["temp_on_tooltip"]:
+                    gatherDetails.get_thermals()
+                    if gatherDetails.thermalData:
+                        gatherDetails.thermalData = _THERMAL_RE.sub(
+                            "", gatherDetails.thermalData
+                        )
 
-            gatherDetails.decide_game_type()
+                gatherDetails.decide_game_type()
+            gathered_output = gather_buf.getvalue()
 
             if gatherDetails.name:
                 gatherDetails.name = _THERMAL_RE.sub("", gatherDetails.name)
 
+            clear()
+            _print_header(closed)
+            _print_gather_output(gathered_output)
+
             if prepWork.config["show_only_in_game"] and not gatherDetails.isInGame:
-                print("On XMB, skipping RPC update (show_only_in_game)")
+                print(
+                    f"  {C.GRAY}On XMB, skipping RPC update "
+                    f"(show_only_in_game){C.RESET}"
+                )
                 sleep(prepWork.config["wait_seconds"])
                 continue
 
@@ -120,9 +167,10 @@ def run_loop(prepWork, gatherDetails, timer):
                 prepWork.RPC.close()
                 prepWork.connect_to_discord()
             except ServerError as e:
-                print(f"Discord rejected the RPC update: {e}")
+                err(f"Discord rejected the RPC update: {e}")
                 print(
-                    "If you have more than one instance of PS3-RPC running, please close the others."
+                    f"  {C.GRAY}If you have more than one instance of PS3-RPC "
+                    f"running, please close the others.{C.RESET}"
                 )
 
             sleep(prepWork.config["wait_seconds"])
