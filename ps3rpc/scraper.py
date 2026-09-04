@@ -19,12 +19,16 @@ from ps3rpc.config import (
 from ps3rpc.ui import C, ok, warn
 
 
+_LABEL_WIDTH = 10  # widest current label ("Game type:") — keeps the log table-aligned
+
+
 def _log(label, value=""):
-    """Dim, consistently formatted debug line: '  label  value'."""
+    """Dim, table-aligned debug line: 'label      value'."""
+    padded = label.ljust(_LABEL_WIDTH)
     if value:
-        print(f"  {C.GRAY}{label}{C.RESET}  {value}")
+        print(f"{C.GRAY}{padded}{C.RESET} {value}")
     else:
-        print(f"  {C.GRAY}{label}{C.RESET}")
+        print(f"{C.GRAY}{label}{C.RESET}")
 
 
 def _temp_color(celsius):
@@ -103,25 +107,25 @@ class GatherDetails:
             self.soup = BeautifulSoup(response.text, "html.parser")
             return True
         except ConnectionError as e:
-            warn(f'get_html():  webman not found. "{e}".')
+            warn(f'Connection: webman not found. "{e}".')
             return False
 
     def get_thermals(self):
         thermal_tag = self.soup.find("a", href="/cpursx.ps3?up")
         if thermal_tag is None:
-            warn("get_thermals(): could not find thermal data in HTML")
+            warn("Thermals: could not find thermal data in HTML")
             return
         thermalData = str(thermal_tag)
         cpu = re.search(r"CPU(.+?)C", thermalData)
         rsx = re.search(r"RSX(.+?)C", thermalData)
         if cpu and rsx:
             self.thermalData = f"{cpu.group(0)} | {rsx.group(0)}"
-            _log("get_thermals():", _colorize_temps(cpu.group(0), rsx.group(0)))
+            _log("Thermals:", _colorize_temps(cpu.group(0), rsx.group(0)))
         else:
             from ps3rpc.config import wmanVer
 
             warn(
-                f"get_thermals(): could not find html for thermal data, "
+                f"Thermals: could not find html for thermal data, "
                 f"has webmanMOD been updated since {wmanVer}?"
             )
 
@@ -129,7 +133,7 @@ class GatherDetails:
         self.isRetroGame = False
         self.isInGame = False
         if self.soup.find("a", target="_blank") is not None:
-            _log("decide_game_type():", f"{C.GREEN}PS3 Game or Homebrew{C.RESET}")
+            _log("Game type:", f"{C.GREEN}PS3 Game or Homebrew{C.RESET}")
             self.isInGame = True
             self.get_PS3_details()
         elif (
@@ -138,10 +142,10 @@ class GatherDetails:
         ):
             self.isRetroGame = True
             self.isInGame = True
-            _log("decide_game_type():", f"{C.MAGENTA}Retro{C.RESET}")
+            _log("Game type:", f"{C.MAGENTA}Retro{C.RESET}")
             self.get_retro_details()
         else:
-            _log("decide_game_type():", f"{C.BLUE}XMB{C.RESET}")
+            _log("Game type:", f"{C.BLUE}XMB{C.RESET}")
             self.name = "XMB"
             self.image = "xmb"
             self.titleID = None
@@ -166,11 +170,11 @@ class GatherDetails:
                 match = _GOOGLE_SEARCH_RE.search(google_tag.get("href", ""))
                 if match:
                     name = match.group(1)
-                    _log("get_PS3_details():", f"name from search link: {name}")
+                    _log("Game:", f"name from search link: {name}")
         self.name = name or titleID
         self.titleID = titleID
         _log(
-            "get_PS3_details():",
+            "Game:",
             f"{C.GRAY}{titleID}{C.RESET} {C.GRAY}|{C.RESET} "
             f"{C.WHITE}{C.BOLD}{self.name}{C.RESET}",
         )
@@ -191,7 +195,7 @@ class GatherDetails:
                     if match:
                         name = match.group(1)
         self.name = name
-        _log("get_retro_details():", f"{C.WHITE}{C.BOLD}{name}{C.RESET}")
+        _log("Game:", f"{C.WHITE}{C.BOLD}{name}{C.RESET}")
         self.get_retro_image()
 
     def get_PS3_image(self):
@@ -200,12 +204,12 @@ class GatherDetails:
             icon_url = self.use_icon0()
             if icon_url:
                 self.image = icon_url
-                _log("get_PS3_image():", f"{C.CYAN}{self.image}{C.RESET}")
+                _log("Cover:", f"{C.CYAN}{self.image}{C.RESET}")
                 return
         if not self.prep.config["prefer_dev_app"]:
             self.image = self.use_gametdb()
         image_color = C.CYAN if self.image.startswith("http") else C.GRAY
-        _log("get_PS3_image():", f"{image_color}{self.image}{C.RESET}")
+        _log("Cover:", f"{image_color}{self.image}{C.RESET}")
 
     def use_icon0(self):
         """Fetch the game's ICON0.PNG from the PS3 and upload to uguu.se"""
@@ -217,19 +221,17 @@ class GatherDetails:
         try:
             resp = self.session.get(icon_url, timeout=8)
             if resp.status_code != 200 or not resp.content:
-                warn(f"use_icon0(): no ICON0.PNG found at {icon_url}")
+                warn(f"Cover: no ICON0.PNG found at {icon_url}")
                 return None
         except requests.RequestException as e:
-            warn(f"use_icon0(): could not fetch ICON0.PNG ({type(e).__name__})")
+            warn(f"Cover: could not fetch ICON0.PNG ({type(e).__name__})")
             return None
 
         icon_bytes = resp.content
         try:
             icon_bytes = _square_pad(icon_bytes)
         except Exception as e:
-            warn(
-                f"use_icon0(): could not square the icon ({type(e).__name__}), uploading as-is"
-            )
+            warn(f"Cover: could not square the icon ({type(e).__name__}), uploading as-is")
 
         try:
             upload = requests.post(
@@ -242,10 +244,10 @@ class GatherDetails:
             if not uploaded_url.startswith("http"):
                 raise ValueError(f"unexpected response: {uploaded_url!r}")
         except (requests.RequestException, ValueError) as e:
-            warn(f"use_icon0(): upload to uguu.se failed ({type(e).__name__})")
+            warn(f"Cover: upload to uguu.se failed ({type(e).__name__})")
             return None
 
-        ok(f"use_icon0(): uploaded cover to {uploaded_url}")
+        ok(f"Cover: uploaded to {uploaded_url}")
         self._icon0_cache[self.titleID] = uploaded_url
         return uploaded_url
 
@@ -261,7 +263,7 @@ class GatherDetails:
         region_code = region_map.get(self.titleID[2])
         if not region_code:
             warn(
-                f"use_gametdb(): Unexpected key: {self.titleID[2]} — "
+                f"Cover: unexpected region key {self.titleID[2]} — "
                 "falling back to Discord dev app images"
             )
             return self.titleID.lower()
@@ -269,11 +271,11 @@ class GatherDetails:
         try:
             resp = self.session.get(url, headers={"User-Agent": "PS3RPC/2.0.1"})
             if resp.status_code == 200:
-                ok("use_gametdb(): using GameTDB cover")
+                ok("Cover: using GameTDB cover")
                 return url
         except requests.RequestException:
             pass
-        warn(f"use_gametdb(): no image found at {url}, using Discord dev app image")
+        warn(f"Cover: no image found at {url}, using Discord dev app image")
         return self.titleID.lower()
 
     def get_retro_image(self):
@@ -283,4 +285,4 @@ class GatherDetails:
         imgName = re.sub(r"[\W]+", "", imgName)
         imgName = imgName[:32]
         self.image = imgName
-        _log("get_retro_image():", f"{C.GRAY}{imgName}{C.RESET}")
+        _log("Cover:", f"{C.GRAY}{imgName}{C.RESET}")

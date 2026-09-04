@@ -90,9 +90,9 @@ def _arrow_select(prompt, options):
     def render():
         for i, opt in enumerate(options):
             if i == selected:
-                sys.stdout.write(f"  {C.YELLOW}{C.BOLD}> {opt}{C.RESET}\r\n")
+                sys.stdout.write(f"{C.YELLOW}{C.BOLD}> {opt}{C.RESET}\r\n")
             else:
-                sys.stdout.write(f"    {C.GRAY}{opt}{C.RESET}\r\n")
+                sys.stdout.write(f"  {C.GRAY}{opt}{C.RESET}\r\n")
         sys.stdout.flush()
 
     def move_up():
@@ -125,9 +125,9 @@ def _toggle_select(prompt, items, values):
         for i, (key, label) in enumerate(items):
             box = f"{C.GREEN}[x]{C.RESET}" if values[key] else f"{C.GRAY}[ ]{C.RESET}"
             if i == selected:
-                sys.stdout.write(f"  {C.YELLOW}{C.BOLD}>{C.RESET} {box} {label}\r\n")
+                sys.stdout.write(f"{C.YELLOW}{C.BOLD}>{C.RESET} {box} {label}\r\n")
             else:
-                sys.stdout.write(f"    {box} {C.GRAY}{label}{C.RESET}\r\n")
+                sys.stdout.write(f"  {box} {C.GRAY}{label}{C.RESET}\r\n")
         sys.stdout.flush()
 
     def move_up():
@@ -213,7 +213,7 @@ class PrepWork:
         else:
             self.config = default_config.copy()
             print(
-                f"  {C.GRAY}No config file found — a new one will be saved to "
+                f"{C.GRAY}No config file found — a new one will be saved to "
                 f"{self.config_path}{C.RESET}"
             )
             self.prompt_user()
@@ -298,7 +298,7 @@ class PrepWork:
         network = ipaddress.ip_network(f"{host_ip}/24", strict=False)
         targets = [str(ip) for ip in network.hosts() if str(ip) != host_ip]
         print(
-            f"  {C.GRAY}Scanning {network} for webMAN "
+            f"{C.GRAY}Scanning {network} for webMAN "
             f"({len(targets)} addresses)...{C.RESET}"
         )
 
@@ -319,15 +319,15 @@ class PrepWork:
             return
 
         warn("No webMAN instance found on the network.")
-        print(f"  {C.GRAY}Falling back to manual IP entry.{C.RESET}")
+        print(f"{C.GRAY}Falling back to manual IP entry.{C.RESET}")
         self.get_IP_from_user()
 
     def get_IP_from_user(self):
         while True:
             ip = input(
-                f"  {C.BOLD}Enter your PS3's IP address{C.RESET} "
+                f"{C.BOLD}Enter your PS3's IP address{C.RESET} "
                 f"{C.GRAY}(for example: 192.168.0.122),{C.RESET}\n"
-                f"  {C.GRAY}or press Ctrl+C to quit:{C.RESET} "
+                f"{C.GRAY}or press Ctrl+C to quit:{C.RESET} "
             ).strip()
             if not ip:
                 warn("No address entered.\n")
@@ -337,7 +337,7 @@ class PrepWork:
             if self.test_for_webman(ip):
                 self.save_config(ip)
                 break
-            print(f"  {C.GRAY}Please try again.{C.RESET}\n")
+            print(f"{C.GRAY}Please try again.{C.RESET}\n")
 
     def test_for_webman(self, ip, silent=False):
         ip = str(ip or "").strip()
@@ -379,7 +379,7 @@ class PrepWork:
             except (DiscordNotFound, InvalidPipe, ConnectionRefusedError) as e:
                 err(f'Could not connect to Discord: "{e}"')
                 print(
-                    f"  {C.GRAY}Ensure Discord is running. If PS3-RPC is a systemd "
+                    f"{C.GRAY}Ensure Discord is running. If PS3-RPC is a systemd "
                     f"service, Discord must be running in the same user "
                     f"session.{C.RESET}"
                 )

@@ -30,12 +30,12 @@ def key_opt(key: str, label: str, note: str = "") -> str:
 
 
 def ok(msg: str) -> None:
-    print(f"  {C.GREEN}✓  {msg}{C.RESET}")
+    print(f"{C.GREEN}✓  {msg}{C.RESET}")
 
 
 def err(msg: str) -> None:
-    print(f"  {C.RED}✗  {msg}{C.RESET}")
+    print(f"{C.RED}✗  {msg}{C.RESET}")
 
 
 def warn(msg: str) -> None:
-    print(f"  {C.YELLOW}⚠  {msg}{C.RESET}")
+    print(f"{C.YELLOW}⚠  {msg}{C.RESET}")
