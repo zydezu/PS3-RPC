@@ -8,3 +8,4 @@ PS3RPC.spec
 icon.ico
 logo.png
 __pycache__
+uv.lock

@@ -8,17 +8,37 @@ from ps3rpc.scraper import GatherDetails
 
 def main():
     prepWork = PrepWork()
-    prepWork.read_config()
-    prepWork.connect_to_discord()
+    try:
+        prepWork.read_config()
+    except KeyboardInterrupt:
+        print("\nSetup cancelled — nothing was saved. Exiting.")
+        return
+
+    if not str(prepWork.config.get("ip") or "").strip():
+        print(
+            "\nNo reachable PS3 was configured, so PS3-RPC can't start.\n"
+            "Re-run once your PS3 is on with webMAN MOD running, or edit the\n"
+            f'"ip" value in {prepWork.config_path} directly.'
+        )
+        return
+
+    try:
+        prepWork.connect_to_discord()
+        gatherDetails = GatherDetails(prepWork)
+        timer = int(time()) if prepWork.config["show_timer"] else None
+        run_loop(prepWork, gatherDetails, timer)
+    except KeyboardInterrupt:
+        print("\nShutting down PS3-RPC.")
+        if prepWork.RPC is not None:
+            try:
+                prepWork.RPC.clear()
+                prepWork.RPC.close()
+            except Exception:
+                pass
+
+
+def run_loop(prepWork, gatherDetails, timer):
     closed = False
-    gatherDetails = GatherDetails(prepWork)
-    timer = None
-    if prepWork.config["show_timer"]:
-        timer = int(time())
-
-    if not prepWork.config["ip"]:
-        exit("script failed to execute critical functions.")
-
     while True:
         if not gatherDetails.get_html():
             if gatherDetails.isRetroGame:

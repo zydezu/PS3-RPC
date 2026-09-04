@@ -5,7 +5,6 @@ description = "PS3 Rich Presence for Discord"
 requires-python = ">=3.9"
 dependencies = [
     "bs4",
-    "networkscan",
     "pypresence",
     "requests",
 ]

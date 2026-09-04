@@ -1,16 +1,16 @@
+import ipaddress
 import json
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from socket import AF_INET, SOCK_DGRAM, socket
 from time import sleep
 
-import networkscan
 import requests
 from bs4 import BeautifulSoup
 from pypresence import DiscordNotFound, InvalidPipe
 from pypresence.presence import Presence
-from requests.exceptions import ConnectionError
 
 default_config = {
     "ip": "",
@@ -37,6 +37,7 @@ _RETRO_LINK_RE = re.compile(r'">(.*)</a>')
 _VERSION_RE = re.compile(r"(.+)\d{2}\.\d{2}")
 _THERMAL_RE = re.compile(r"Â")
 _GOOGLE_SEARCH_RE = re.compile(r"google\.com/search\?q=([^\"&]+)")
+_IPV4_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
 SEPARATOR = "=" * 25 + "\n"
 
 
@@ -105,6 +106,23 @@ def _arrow_select(prompt, options):
         return selected
 
 
+def _page_is_webman(html):
+    """True if an HTML page's <title> looks like webMAN MOD."""
+    soup = BeautifulSoup(html, "html.parser")
+    title_tag = soup.find("title")
+    page_title = title_tag.get_text(strip=True) if title_tag else ""
+    return "wMAN" in page_title or "webMAN" in page_title
+
+
+def _scan_probe(ip, timeout):
+    """HTTP-probe a single address. Returns the ip if webMAN answers, else None."""
+    try:
+        resp = requests.get(f"http://{ip}", timeout=timeout, headers=headers)
+    except requests.RequestException:
+        return None
+    return ip if _page_is_webman(resp.text) else None
+
+
 class PrepWork:
     config_path = Path("ps3rpcconfig.json")
 
@@ -125,7 +143,7 @@ class PrepWork:
                     "resetting to defaults."
                 )
                 self.config_path.unlink()
-                self.config = default_config
+                self.config = default_config.copy()
                 self.prompt_user()
                 return
             missing = {k: v for k, v in default_config.items() if k not in self.config}
@@ -136,11 +154,18 @@ class PrepWork:
                     f"Config updated with {len(missing)} new default(s): {', '.join(missing)}"
                 )
             self.config["wait_seconds"] = max(15, self.config["wait_seconds"])
-            if not self.test_for_webman(self.config["ip"]) and self.config["ip_prompt"]:
-                print("PS3 cannot be reached via the IP saved in the config file.")
+            saved_ip = str(self.config.get("ip") or "").strip()
+            if not saved_ip:
+                print("No PS3 IP address is saved yet.")
+                self.prompt_user()
+            elif self.config["ip_prompt"] and not self.test_for_webman(saved_ip):
+                print(f'PS3 cannot be reached at the saved IP address "{saved_ip}".')
                 self.prompt_user()
         else:
-            self.config = default_config
+            self.config = default_config.copy()
+            print(
+                f"No config file found — a new one will be saved to {self.config_path}"
+            )
             self.prompt_user()
 
     def prompt_user(self):
@@ -160,83 +185,87 @@ class PrepWork:
             self.get_IP_from_user()
 
     def grab_host_network(self):
-        hostNetwork = None
+        host_ip = None
         try:
             tempSock = socket(AF_INET, SOCK_DGRAM)
             tempSock.connect(("8.8.8.8", 80))
-            hostNetwork = tempSock.getsockname()[0]
+            host_ip = tempSock.getsockname()[0]
             tempSock.close()
         except Exception as e:
             print(f'Error while getting host network: "{e}"')
 
-        if hostNetwork is not None:
-            hostNetwork = hostNetwork.rsplit(".", 1)[0] + "."
-            print(f"Detected network: {hostNetwork}0/24")
-            self.scan_network(hostNetwork)
+        if host_ip is not None:
+            self.scan_network(host_ip)
         else:
             print("Could not determine host network. Falling back to manual entry.")
             self.get_IP_from_user()
 
-    def scan_network(self, my_network):
-        my_network += "0/24"
-        max_retries = 5
-        for attempt in range(1, max_retries + 1):
-            print(f"Scanning {my_network} for PS3... (attempt {attempt}/{max_retries})")
-            my_scan = networkscan.Networkscan(my_network)
-            my_scan.run()
+    def scan_network(self, host_ip, timeout=1.5, workers=64):
+        # every address in the range is HTTP-probed
+        network = ipaddress.ip_network(f"{host_ip}/24", strict=False)
+        targets = [str(ip) for ip in network.hosts() if str(ip) != host_ip]
+        print(f"Scanning {network} for webMAN ({len(targets)} addresses...")
 
-            hosts = my_scan.list_of_hosts_found
-            print(f"Scan complete — {len(hosts)} host(s) found.")
+        found = None
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_scan_probe, ip, timeout): ip for ip in targets}
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    found = result
+                    for pending in futures:
+                        pending.cancel()
+                    break
 
-            for host in hosts:
-                if self.test_for_webman(host, silent=True):
-                    print(f'PS3 found at "{host}".')
-                    self.save_config(host)
-                    return
+        if found:
+            print(f'PS3 found at "{found}".')
+            self.save_config(found)
+            return
 
-            if attempt < max_retries:
-                print("PS3 not found. Retrying in 20 seconds...")
-                sleep(10)
-
-        print(f"PS3 not found after {max_retries} scan attempts.")
+        print("No webMAN instance found on the network.")
         print("Falling back to manual IP entry.")
         self.get_IP_from_user()
 
     def get_IP_from_user(self):
         while True:
             ip = input(
-                "Enter your PS3's IP address\n(for example: 192.168.0.122): "
+                "Enter your PS3's IP address (for example: 192.168.0.122),\n"
+                "or press Ctrl+C to quit: "
             ).strip()
+            if not ip:
+                print("No address entered.\n")
+                continue
+            if _IPV4_RE.match(ip) is None:
+                print(f'"{ip}" does not look like an IPv4 address — trying it anyway.')
             if self.test_for_webman(ip):
                 self.save_config(ip)
                 break
-            print("Could not connect to PS3 at that address. Please try again.")
+            print("Could not connect to PS3 at that address. Please try again.\n")
 
     def test_for_webman(self, ip, silent=False):
+        ip = str(ip or "").strip()
+        if not ip:
+            if not silent:
+                print("No IP address to test.")
+            return False
         url = f"http://{ip}"
         try:
-            response = self.session.get(url)
-        except ConnectionError:
+            response = self.session.get(url, timeout=5)
+        except requests.RequestException as e:
             if not silent:
-                print(f'No webpage found on "{ip}"')
+                print(f'Could not reach a webpage on "{ip}" ({type(e).__name__}).')
             return False
-        if response is not None:
-            soup = BeautifulSoup(response.text, "html.parser")
-            title_tag = soup.find("title")
-            pageTitle = title_tag.get_text(strip=True) if title_tag else ""
-            if "wMAN" in pageTitle or "webMAN" in pageTitle:
-                if not silent:
-                    print(f'Given IP "{ip}" belongs to webman.')
-                return True
-            else:
-                if not silent:
-                    print(
-                        f'WebmanMOD not found on "{ip}", reports "{pageTitle}". '
-                        "If you believe this is an error, please contact the developer. "
-                        "Please ensure the PS3 is turned on, has webmanMOD installed and running, "
-                        "and is connected to the same network as the PC."
-                    )
-                return False
+        if _page_is_webman(response.text):
+            if not silent:
+                print(f'Given IP "{ip}" belongs to webMAN.')
+            return True
+        if not silent:
+            print(
+                f'webMAN MOD not found on "{ip}". '
+                "Please ensure the PS3 is turned on, has webMAN MOD installed and "
+                "running, and is connected to the same network as the PC."
+            )
+        return False
 
     def save_config(self, valid_ip):
         self.config["ip"] = valid_ip
