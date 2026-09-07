@@ -165,10 +165,27 @@ jobs:
           restore-keys: macos-universal-pip-
       - name: Install dependencies
         run: |
+          set -euo pipefail
           "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3" -m venv .venv
           source .venv/bin/activate
-          python -m pip install --upgrade pip setuptools wheel
-          pip install --only-binary=:all: -r requirements.txt
+          python -m pip install --upgrade pip setuptools wheel "delocate>=0.11"
+
+          # Pillow publishes no universal2 wheel, so fuse the per-arch wheels into one.
+          mkdir -p wheels/arm64 wheels/x86_64 wheels/universal2
+          pip download --only-binary=:all: --no-deps --implementation cp \
+            --python-version 3.13 --abi cp313 \
+            --platform macosx_11_0_arm64 --platform macosx_12_0_arm64 --platform macosx_14_0_arm64 \
+            -d wheels/arm64 pillow
+          pip download --only-binary=:all: --no-deps --implementation cp \
+            --python-version 3.13 --abi cp313 \
+            --platform macosx_10_10_x86_64 --platform macosx_10_13_x86_64 \
+            --platform macosx_10_15_x86_64 --platform macosx_11_0_x86_64 \
+            -d wheels/x86_64 pillow
+          delocate-fuse wheels/arm64/*.whl wheels/x86_64/*.whl -w wheels/universal2
+          pip install wheels/universal2/*.whl
+
+          # Remaining deps are pure Python; force charset-normalizer's pure build too.
+          pip install --no-binary charset-normalizer -r requirements.txt
       - name: Install PyInstaller
         run: |
           source .venv/bin/activate
@@ -178,7 +195,9 @@ jobs:
           source .venv/bin/activate
           pyinstaller --onefile --target-arch universal2 --name "PS3RPC_MacOS_Universal" start.py
       - name: Verify universal binary
-        run: lipo -archs dist/PS3RPC_MacOS_Universal
+        run: |
+          lipo -archs dist/PS3RPC_MacOS_Universal
+          file dist/PS3RPC_MacOS_Universal
       - name: Upload macOS universal artifact
         uses: actions/upload-artifact@v7
         with:
