@@ -170,7 +170,7 @@ jobs:
             --platform macosx_10_10_x86_64 --platform macosx_10_13_x86_64 \
             --platform macosx_10_15_x86_64 --platform macosx_11_0_x86_64 \
             -d wheels/x86_64 pillow
-          delocate-fuse wheels/arm64/*.whl wheels/x86_64/*.whl -w wheels/universal2
+          delocate-merge wheels/arm64/*.whl wheels/x86_64/*.whl -w wheels/universal2
           pip install wheels/universal2/*.whl
 
           # Remaining deps are pure Python; force charset-normalizer's pure build too.
