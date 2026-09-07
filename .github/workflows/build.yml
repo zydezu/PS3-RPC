@@ -134,73 +134,43 @@ jobs:
           name: PS3RPC_Linux_ARM64
           path: dist/PS3RPC_Linux_ARM64
 
-  macos_x64:
-    name: Build macOS x64
-    runs-on: macos-15-intel
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-      - name: Cache Python dependencies
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/pip
-          key: macos-x64-pip-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            macos-x64-pip-
-      - name: Install dependencies
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
-      - name: Install PyInstaller
-        run: |
-          source .venv/bin/activate
-          pip install pyinstaller
-      - name: Build macOS x64 executable
-        run: |
-          source .venv/bin/activate
-          pyinstaller --onefile --name "PS3RPC_MacOS_x64" start.py
-      - name: Upload macOS x64 artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: PS3RPC_MacOS_x64
-          path: dist/PS3RPC_MacOS_x64
-
-  macos_arm64:
-    name: Build macOS ARM64
+  macos_universal:
+    name: Build macOS Universal
     runs-on: macos-latest
+    env:
+      PYTHON_VERSION: "3.13.7"
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
+      - name: Install universal2 Python
+        run: |
+          curl -fsSLo python.pkg "https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macos11.pkg"
+          sudo installer -pkg python.pkg -target /
       - name: Cache Python dependencies
         uses: actions/cache@v5
         with:
           path: ~/.cache/pip
-          key: macos-arm64-pip-${{ hashFiles('requirements.txt') }}
+          key: macos-universal-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
-            macos-arm64-pip-
+            macos-universal-pip-
       - name: Install dependencies
         run: |
-          python -m venv .venv
+          "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3" -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          pip install --only-binary=:all: -r requirements.txt
       - name: Install PyInstaller
         run: |
           source .venv/bin/activate
           pip install pyinstaller
-      - name: Build macOS ARM64 executable
+      - name: Build macOS universal executable
         run: |
           source .venv/bin/activate
-          pyinstaller --onefile --name "PS3RPC_MacOS_ARM64" start.py
-      - name: Upload macOS ARM64 artifact
+          pyinstaller --onefile --target-arch universal2 --name "PS3RPC_MacOS_Universal" start.py
+      - name: Verify universal binary
+        run: lipo -archs dist/PS3RPC_MacOS_Universal
+      - name: Upload macOS universal artifact
         uses: actions/upload-artifact@v7
         with:
-          name: PS3RPC_MacOS_ARM64
-          path: dist/PS3RPC_MacOS_ARM64
+          name: PS3RPC_MacOS_Universal
+          path: dist/PS3RPC_MacOS_Universal
 

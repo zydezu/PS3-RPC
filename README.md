@@ -20,7 +20,7 @@ A program to display what game you're playing on homebrewed PS3 via your PC!
 * PS3 and PC on the same network/internet connection
 * Discord installed and open on the PC running the script
 * Administrator permissions on the PC
-* A Python 3.9 interpreter installed on the PC if you aren't using the .exe
+* A Python 3.13 interpreter installed on the PC if you aren't using the .exe
 
 ### Windows
 * Download the `PS3RPC_Windows_*.exe` from the [latest release](https://github.com/zydezu/PS3-RPC/releases/latest), x64 for 64-bit device or ARM64 for an ARM64 device
