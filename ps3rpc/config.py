@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from socket import AF_INET, SOCK_DGRAM, socket
 from time import sleep
+from typing import ClassVar
 
 import requests
 from bs4 import BeautifulSoup
@@ -173,13 +174,22 @@ def _scan_probe(ip, timeout):
 
 
 class PrepWork:
-    config_path = Path("ps3rpcconfig.json")
-
     def __init__(self):
         self.RPC = None
         self.config = {}
+        self.config_path = self._resolve_config_path()
         self.session = requests.Session()
         self.session.headers.update(headers)
+
+    @staticmethod
+    def _resolve_config_path():
+        home = Path("~/ps3rpcconfig.json").expanduser()
+        local = Path("ps3rpcconfig.json")
+        if home.is_file():
+            return home
+        if local.is_file():
+            return local
+        return local
 
     def read_config(self):
         if self.config_path.is_file():
@@ -238,7 +248,7 @@ class PrepWork:
             self.get_IP_from_user()
 
     # Options shown on the first-run toggle screen.
-    _TOGGLE_OPTIONS = [
+    _TOGGLE_OPTIONS: ClassVar = [
         ("show_temp", "Show PS3 CPU/RSX temperature in the presence"),
         ("retro_covers", "Use game-specific covers for PS1/PS2 games"),
         ("ip_prompt", "Re-prompt for IP if the PS3 can't be reached on startup"),
