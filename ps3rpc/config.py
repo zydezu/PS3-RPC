@@ -204,13 +204,18 @@ class PrepWork:
 
     @staticmethod
     def _resolve_config_path():
-        home = Path("~/ps3rpcconfig.json").expanduser()
+        xdg = Path("~/.config/ps3-rpc/ps3rpcconfig.json").expanduser()
+        legacy_home = Path("~/ps3rpcconfig.json").expanduser()
         local = Path("ps3rpcconfig.json")
-        if home.is_file():
-            return home
+        if xdg.is_file():
+            return xdg
+        if legacy_home.is_file():
+            xdg.parent.mkdir(parents=True, exist_ok=True)
+            legacy_home.rename(xdg)
+            return xdg
         if local.is_file():
             return local
-        return local
+        return xdg
 
     def read_config(self):
         if self.config_path.is_file():
@@ -446,6 +451,7 @@ class PrepWork:
 
     def save_config(self, valid_ip):
         self.config["ip"] = valid_ip
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
         with self.config_path.open(mode="w+") as f:
             json.dump(self.config, f, indent=4)
 

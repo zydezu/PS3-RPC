@@ -107,7 +107,7 @@ For more depth logs you can use `journalctl --user -xeu ps3rpc`
 This script can utilise images provided by [GameTDB](https://www.gametdb.com/), if you are able, consider supporting the service.
 
 ### External config file
-PS3-RPC makes use of an external config file named `ps3rpcconfig.json` to store settings. 
+PS3-RPC makes use of an external config file named `ps3rpcconfig.json`, stored in `~/.config/ps3-rpc/`, to store settings. 
 
 | Key | Default | Description |
 |---|---|---|

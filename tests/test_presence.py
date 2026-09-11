@@ -29,6 +29,7 @@ def main():
         print(f"Loaded config from {prep.config_path}")
     else:
         prep.config = default_config
+        prep.config_path.parent.mkdir(parents=True, exist_ok=True)
         with prep.config_path.open("w") as f:
             json.dump(prep.config, f, indent=4)
         print(f"No config found — created {prep.config_path} with defaults.")
