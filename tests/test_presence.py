@@ -52,27 +52,33 @@ def main():
     gd._prev_title = ""
     gd.get_PS3_image()
 
-    if prep.config["show_temp"] or prep.config["temp_on_tooltip"]:
-        gd.thermalData = "CPU 65°C | RSX 70°C"
+    if prep.config["show_tooltip"]:
+        gd.temps = "CPU 65°C | RSX 70°C"
 
     timer = int(time())
     console = "PS3" if prep.config["short_console_name"] else "PlayStation®3 system"
     playing_on = f"Playing on {console}"
 
-    large_text = gd.thermalData if prep.config["temp_on_tooltip"] else gd.titleID
-    temp_line = gd.thermalData if prep.config["show_temp"] else None
+    show_tooltip = prep.config["show_tooltip"]
+    as_status_line = show_tooltip and prep.config["tooltip_as_status_line"]
+    tooltip_text = gd.build_tooltip() if show_tooltip else None
+    game_id_text = (
+        gd.titleID if not show_tooltip or prep.config["tooltip_game_id"] else None
+    )
+    large_text = game_id_text if as_status_line else tooltip_text or game_id_text
+    status_extra = tooltip_text if as_status_line else None
 
     rpc_kwargs = {
         "large_image": gd.image,
-        "large_text": large_text or gd.titleID,
+        "large_text": large_text,
         "start": timer,
     }
     if prep.config["use_appname"]:
         rpc_kwargs["details"] = gd.name
-        rpc_kwargs["state"] = temp_line or playing_on
+        rpc_kwargs["state"] = status_extra or playing_on
     else:
         rpc_kwargs["name"] = gd.name
-        rpc_kwargs["details"] = temp_line
+        rpc_kwargs["details"] = status_extra
         rpc_kwargs["state"] = playing_on
 
     print(f"\nSetting presence: {GAME_NAME} ({TITLE_ID})")

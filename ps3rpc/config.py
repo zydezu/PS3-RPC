@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import os
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -19,9 +20,9 @@ default_config = {
     "ip": "",
     "client_id": 1512043386327007253,
     "wait_seconds": 30,
-    "show_temp": False,
     "show_clocks": False,
     "show_hdd_free": False,
+    "show_fan_speed": False,
     "retro_covers": False,
     "hibernate_seconds": 600,
     "ip_prompt": True,
@@ -33,10 +34,10 @@ default_config = {
     "short_console_name": True,
     "show_only_in_game": True,
     "show_tooltip": True,
+    "tooltip_as_status_line": False,
     "tooltip_temp": True,
+    "tooltip_game_id": True,
     "show_firmware": False,
-    "search_button": True,
-    "search_url_template": "https://www.google.com/search?q={query}+PS3",
 }
 
 headers = {"User-Agent": "Mozilla/5.0"}
@@ -50,6 +51,7 @@ _THERMAL_RE = re.compile(r"Â")
 _GOOGLE_SEARCH_RE = re.compile(r"google\.com/search\?q=([^\"&]+)")
 _CLOCKS_RE = re.compile(r"GPU:\s*(\d+)\s*Mhz.*?VRAM:\s*(\d+)\s*Mhz", re.IGNORECASE)
 _HDD_RE = re.compile(r"HDD:\s*([\d.,]+\s*[KMGT]B)\s*free", re.IGNORECASE)
+_FAN_RE = re.compile(r"FAN(?:\s*SPEED)?:\s*(\d+)\s*%", re.IGNORECASE)
 _FIRMWARE_RE = re.compile(
     r"Firmware:\s*([0-9.]+\s+[A-Za-z]+(?:\s+Cobra\s+[0-9.]+)?(?:\s+HEN)?)"
 )
@@ -203,19 +205,38 @@ class PrepWork:
         self.session.headers.update(headers)
 
     @staticmethod
+    def _config_dir():
+        if sys.platform == "win32":
+            return Path(os.environ.get("APPDATA", "~")).expanduser() / "ps3-rpc"
+        return Path("~/.config/ps3-rpc").expanduser()
+
+    @staticmethod
+    def _app_dir():
+        # PyInstaller onefile builds run from a temp extraction dir, so use the
+        # actual .exe's folder instead of cwd/__file__ when frozen.
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+        return Path.cwd()
+
+    @staticmethod
     def _resolve_config_path():
-        xdg = Path("~/.config/ps3-rpc/ps3rpcconfig.json").expanduser()
+        # Portable mode
+        app_dir = PrepWork._app_dir()
+        if (app_dir / "portable.txt").is_file():
+            return app_dir / "ps3rpcconfig.json"
+
+        preferred = PrepWork._config_dir() / "ps3rpcconfig.json"
         legacy_home = Path("~/ps3rpcconfig.json").expanduser()
         local = Path("ps3rpcconfig.json")
-        if xdg.is_file():
-            return xdg
+        if preferred.is_file():
+            return preferred
         if legacy_home.is_file():
-            xdg.parent.mkdir(parents=True, exist_ok=True)
-            legacy_home.rename(xdg)
-            return xdg
+            preferred.parent.mkdir(parents=True, exist_ok=True)
+            legacy_home.rename(preferred)
+            return preferred
         if local.is_file():
             return local
-        return xdg
+        return preferred
 
     def read_config(self):
         if self.config_path.is_file():
@@ -280,7 +301,10 @@ class PrepWork:
         (
             "Connection",
             [
-                ("ip_prompt", "Re-prompt for IP if the PS3 can't be reached on startup"),
+                (
+                    "ip_prompt",
+                    "Re-prompt for IP if the PS3 can't be reached on startup",
+                ),
             ],
         ),
         (
@@ -302,21 +326,24 @@ class PrepWork:
                     "show_only_in_game",
                     "Only update presence when a game is running (hide on XMB)",
                 ),
-                ("search_button", 'Add a "Search game" button to the activity'),
             ],
         ),
         (
             "System stats",
             [
                 (
-                    "show_temp",
-                    "Show CPU/RSX temperature on the activity status line",
-                ),
-                (
                     "show_tooltip",
                     "Show a details tooltip when hovering over the large image",
                 ),
+                (
+                    "tooltip_as_status_line",
+                    "Show the tooltip contents on the status line instead of as a hover tooltip",
+                ),
                 ("tooltip_temp", "Include CPU/RSX temperature in the tooltip"),
+                (
+                    "tooltip_game_id",
+                    "Include the title ID (e.g. NPUB31848) in the tooltip",
+                ),
                 (
                     "show_clocks",
                     "Include GPU/VRAM clock speeds on the status line / tooltip",
@@ -324,6 +351,10 @@ class PrepWork:
                 (
                     "show_hdd_free",
                     "Include free HDD space on the status line / tooltip",
+                ),
+                (
+                    "show_fan_speed",
+                    "Include fan speed on the status line / tooltip",
                 ),
                 ("show_firmware", "Include the firmware / CFW version in the tooltip"),
             ],
@@ -336,7 +367,10 @@ class PrepWork:
                     "use_icon0",
                     "Use the game's own ICON0.PNG instead of GameTDB/dev app covers",
                 ),
-                ("prefer_dev_app", "Use Discord dev app images instead of GameTDB covers"),
+                (
+                    "prefer_dev_app",
+                    "Use Discord dev app images instead of GameTDB covers",
+                ),
             ],
         ),
     ]

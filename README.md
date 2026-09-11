@@ -9,7 +9,7 @@ A program to display what game you're playing on homebrewed PS3 via your PC!
 |---|---|
 | Default | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default2.png?raw=true"> |
 | `short_console_name: False` | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default.png?raw=true"> |
-| `show_temp: True` | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default3.png?raw=true"> |
+| `tooltip_as_status_line: True` | <img src="https://github.com/zydezu/PS3-RPC/blob/main/img/default3.png?raw=true"> |
 
 
 ## Usage
@@ -107,31 +107,57 @@ For more depth logs you can use `journalctl --user -xeu ps3rpc`
 This script can utilise images provided by [GameTDB](https://www.gametdb.com/), if you are able, consider supporting the service.
 
 ### External config file
-PS3-RPC makes use of an external config file named `ps3rpcconfig.json`, stored in `~/.config/ps3-rpc/`, to store settings. 
+PS3-RPC makes use of an external config file named `ps3rpcconfig.json` to store settings, stored in `~/.config/ps3-rpc/` (or `%APPDATA%\ps3-rpc\` on Windows). 
 
+#### Portable mode
+To keep PS3-RPC self-contained (e.g. running off a USB drive), place an empty file named `portable.txt` next to the executable. When present, `ps3rpcconfig.json` is read from and saved to that same folder instead of the OS config directory.
+
+Options are grouped below the same way they're presented on the first-run setup screen.
+
+#### General
 | Key | Default | Description |
 |---|---|---|
 | `ip` | `""` | Your PS3's IP address |
 | `client_id` | `1512043386327007253` | Discord developer application ID to send presence data to |
 | `wait_seconds` | `30` | How often (in seconds) to refresh presence data (minimum 15) |
-| `show_temp` | `false` | Show CPU/RSX temperature on the activity status line (the text row under the game name) |
-| `show_clocks` | `false` | Include GPU/VRAM clock speeds on the status line / tooltip |
-| `show_hdd_free` | `false` | Include free HDD space on the status line / tooltip |
-| `retro_covers` | `false` | Use game-specific covers for PS1/PS2 games |
 | `hibernate_seconds` | `600` | How long (in seconds) to wait before retrying when PS3 is unreachable |
+
+#### Connection
+| Key | Default | Description |
+|---|---|---|
 | `ip_prompt` | `true` | Re-prompt for IP if the PS3 can't be reached on startup |
+
+#### Elapsed timer
+| Key | Default | Description |
+|---|---|---|
 | `show_timer` | `true` | Display time elapsed in the presence |
 | `accurate_timer` | `true` | Sync the elapsed timer to the PS3's reported in-game play time instead of when the script started |
-| `prefer_dev_app` | `false` | Use Discord dev app images instead of GameTDB covers |
-| `use_icon0` | `true` | Use the game's own `ICON0.PNG` (fetched from the PS3 and re-hosted on [uguu.se](https://uguu.se)) instead of GameTDB/dev app covers |
+
+#### Activity text
+| Key | Default | Description |
+|---|---|---|
 | `use_appname` | `false` | Show game name as the activity details line instead of the app name |
 | `short_console_name` | `true` | Show "PS3" instead of "PlayStation®3 system" in the presence |
 | `show_only_in_game` | `true` | Only update presence when a game is running (hide on XMB) |
+
+#### System stats
+| Key | Default | Description |
+|---|---|---|
 | `show_tooltip` | `true` | Show a details tooltip when hovering over the large image (contents set by the `tooltip_*` / `show_*` options below, plus the title ID) |
+| `tooltip_as_status_line` | `false` | Show the tooltip contents on the activity status line (the text row under the game name) instead of as a hover tooltip |
 | `tooltip_temp` | `true` | Include CPU/RSX temperature in the tooltip |
+| `tooltip_game_id` | `true` | Include the title ID (e.g. `NPUB31848`) in the tooltip |
+| `show_clocks` | `false` | Include GPU/VRAM clock speeds in the tooltip |
+| `show_hdd_free` | `false` | Include free HDD space in the tooltip |
+| `show_fan_speed` | `false` | Include fan speed in the tooltip |
 | `show_firmware` | `false` | Include the firmware / CFW version (e.g. `FW 4.93 CEX Cobra 8.5`) in the tooltip |
-| `search_button` | `true` | Add a "Search game" button linking to a web search for the current game |
-| `search_url_template` | `https://www.google.com/search?q={query}+PS3` | URL for the search button; `{query}` is replaced with the URL-encoded game name |
+
+#### Cover art
+| Key | Default | Description |
+|---|---|---|
+| `retro_covers` | `false` | Use game-specific covers for PS1/PS2 games |
+| `use_icon0` | `true` | Use the game's own `ICON0.PNG` (fetched from the PS3 and re-hosted on [uguu.se](https://uguu.se)) instead of GameTDB/dev app covers |
+| `prefer_dev_app` | `false` | Use Discord dev app images instead of GameTDB covers |
 
 ### Using your own images
 If you'd like to control what images are used for each game, you must create a Discord Developer Application over at the [Discord Developer Portal](https://discord.com/developers/applications).

@@ -99,7 +99,7 @@ def run_loop(prepWork, gatherDetails, timer):
 
             gather_buf = io.StringIO()
             with contextlib.redirect_stdout(gather_buf):
-                if prepWork.config["show_temp"] or prepWork.config["show_tooltip"]:
+                if prepWork.config["show_tooltip"]:
                     gatherDetails.get_thermals()
                 if prepWork.config["show_tooltip"] and prepWork.config["show_firmware"]:
                     gatherDetails.get_firmware()
@@ -144,29 +144,30 @@ def run_loop(prepWork, gatherDetails, timer):
             else:
                 playing_on = f"On {console} XMB"
 
-            if prepWork.config["show_tooltip"]:
-                large_text = gatherDetails.build_tooltip() or gatherDetails.titleID
-            else:
-                large_text = gatherDetails.titleID
+            show_tooltip = prepWork.config["show_tooltip"]
+            as_status_line = show_tooltip and prepWork.config["tooltip_as_status_line"]
+            tooltip_text = gatherDetails.build_tooltip() if show_tooltip else None
+            # titleID is only a fallback for large_text when tooltip_game_id allows it
+            # (or the tooltip feature is off entirely, in which case it doesn't apply).
+            game_id_text = (
+                gatherDetails.titleID
+                if not show_tooltip or prepWork.config["tooltip_game_id"]
+                else None
+            )
+            large_text = game_id_text if as_status_line else tooltip_text or game_id_text
+            status_extra = tooltip_text if as_status_line else None
 
             rpc_kwargs = {
                 "large_image": gatherDetails.image,
                 "large_text": large_text,
                 "start": timer,
             }
-            if gatherDetails.searchURL and prepWork.config["search_button"]:
-                rpc_kwargs["buttons"] = [
-                    {"label": "Search game", "url": gatherDetails.searchURL}
-                ]
-            temp_line = (
-                gatherDetails.thermalData if prepWork.config["show_temp"] else None
-            )
             if prepWork.config["use_appname"]:
                 rpc_kwargs["details"] = gatherDetails.name
-                rpc_kwargs["state"] = temp_line or playing_on
+                rpc_kwargs["state"] = status_extra or playing_on
             else:
                 rpc_kwargs["name"] = gatherDetails.name
-                rpc_kwargs["details"] = temp_line
+                rpc_kwargs["details"] = status_extra
                 rpc_kwargs["state"] = playing_on
 
             try:

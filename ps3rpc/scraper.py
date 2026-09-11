@@ -2,7 +2,6 @@ import io
 import platform
 import re
 import subprocess
-from urllib.parse import quote_plus
 
 import requests
 from bs4 import BeautifulSoup
@@ -11,6 +10,7 @@ from requests.exceptions import ConnectionError
 
 from ps3rpc.config import (
     _CLOCKS_RE,
+    _FAN_RE,
     _FIRMWARE_RE,
     _GOOGLE_SEARCH_RE,
     _HDD_RE,
@@ -57,16 +57,6 @@ def _colorize_temps(cpu_str, rsx_str):
     return f"{colored(cpu_str)} {C.GRAY}|{C.RESET} {colored(rsx_str)}"
 
 
-_DEFAULT_SEARCH_URL = "https://www.google.com/search?q={query}+PS3"
-
-
-def _search_url(name, template=_DEFAULT_SEARCH_URL):
-    try:
-        return template.format(query=quote_plus(name))
-    except (KeyError, IndexError):
-        return _DEFAULT_SEARCH_URL.format(query=quote_plus(name))
-
-
 def _square_pad(png_bytes):
     """Make sure image fits on Discord (1:1)"""
     img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
@@ -88,11 +78,9 @@ class GatherDetails:
         self.soup = None
         self.temps = None
         self.systemExtras = ""
-        self.thermalData = None
         self.firmware = None
         self.name = None
         self.titleID = None
-        self.searchURL = None
         self.image = None
         self.isRetroGame = False
         self.isInGame = False
@@ -140,11 +128,6 @@ class GatherDetails:
             self.temps = _THERMAL_RE.sub("", f"{cpu.group(0)} | {rsx.group(0)}")
             _log("Thermals:", _colorize_temps(cpu.group(0), rsx.group(0)))
             self.systemExtras = self._system_extras()
-            self.thermalData = (
-                f"{self.temps} | {self.systemExtras}"
-                if self.systemExtras
-                else self.temps
-            )
         else:
             from ps3rpc.config import wmanVer
 
@@ -154,9 +137,13 @@ class GatherDetails:
             )
 
     def _system_extras(self):
-        """'GPU 500/650 MHz | HDD 76.8 GB free' from the cpursx page."""
+        """'GPU 500/650 MHz | HDD 76.8 GB free | Fan speed: 45%' from the cpursx page."""
         cfg = self.prep.config
-        if not (cfg.get("show_clocks") or cfg.get("show_hdd_free")):
+        if not (
+            cfg.get("show_clocks")
+            or cfg.get("show_hdd_free")
+            or cfg.get("show_fan_speed")
+        ):
             return ""
         page = self.soup.get_text(" ")
         parts = []
@@ -168,6 +155,10 @@ class GatherDetails:
             hdd = _HDD_RE.search(page)
             if hdd:
                 parts.append(f"HDD {' '.join(hdd.group(1).split())} free")
+        if cfg.get("show_fan_speed"):
+            fan = _FAN_RE.search(page)
+            if fan:
+                parts.append(f"Fan speed: {fan.group(1)}%")
         if parts:
             _log("System:", " | ".join(parts))
         return " | ".join(parts)
@@ -191,17 +182,15 @@ class GatherDetails:
             _log("Firmware:", self.firmware)
 
     def build_tooltip(self):
-        """Large-image hover text: temp/clocks/HDD/firmware (per config) + title ID."""
+        """Large-image hover text: temp/clocks/HDD/firmware/title ID (per config)."""
         temps = self.temps if self.prep.config.get("tooltip_temp") else None
-        parts = [
-            p for p in (temps, self.systemExtras, self.firmware, self.titleID) if p
-        ]
+        titleID = self.titleID if self.prep.config.get("tooltip_game_id") else None
+        parts = [p for p in (temps, self.systemExtras, self.firmware, titleID) if p]
         return " | ".join(parts)
 
     def decide_game_type(self):
         self.isRetroGame = False
         self.isInGame = False
-        self.searchURL = None
         if self.soup.find("a", target="_blank") is not None:
             _log("Game type:", f"{C.GREEN}PS3 Game or Homebrew{C.RESET}")
             self.isInGame = True
@@ -243,7 +232,6 @@ class GatherDetails:
                     _log("Game:", f"name from search link: {name}")
         self.name = name or titleID
         self.titleID = titleID
-        self.searchURL = _search_url(self.name, self.prep.config["search_url_template"])
         _log(
             "Game:",
             f"{C.GRAY}{titleID}{C.RESET} {C.GRAY}|{C.RESET} "
@@ -267,8 +255,6 @@ class GatherDetails:
                     if match:
                         name = match.group(1)
         self.name = name
-        if name != "PlayStation 1/2":
-            self.searchURL = _search_url(name, self.prep.config["search_url_template"])
         _log("Game:", f"{C.WHITE}{C.BOLD}{name}{C.RESET}")
         self.get_retro_image()
 
