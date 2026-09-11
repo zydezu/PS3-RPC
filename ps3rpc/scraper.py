@@ -2,6 +2,7 @@ import io
 import platform
 import re
 import subprocess
+from urllib.parse import quote_plus
 
 import requests
 from bs4 import BeautifulSoup
@@ -9,15 +10,18 @@ from PIL import Image
 from requests.exceptions import ConnectionError
 
 from ps3rpc.config import (
+    _CLOCKS_RE,
+    _FIRMWARE_RE,
     _GOOGLE_SEARCH_RE,
+    _HDD_RE,
     _PS2_RE,
     _PSX_RE,
     _RETRO_LINK_RE,
+    _THERMAL_RE,
     _VERSION_RE,
     headers,
 )
 from ps3rpc.ui import C, ok, warn
-
 
 _LABEL_WIDTH = 10  # widest current label ("Game type:") — keeps the log table-aligned
 
@@ -53,6 +57,16 @@ def _colorize_temps(cpu_str, rsx_str):
     return f"{colored(cpu_str)} {C.GRAY}|{C.RESET} {colored(rsx_str)}"
 
 
+_DEFAULT_SEARCH_URL = "https://www.google.com/search?q={query}+PS3"
+
+
+def _search_url(name, template=_DEFAULT_SEARCH_URL):
+    try:
+        return template.format(query=quote_plus(name))
+    except (KeyError, IndexError):
+        return _DEFAULT_SEARCH_URL.format(query=quote_plus(name))
+
+
 def _square_pad(png_bytes):
     """Make sure image fits on Discord (1:1)"""
     img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
@@ -72,9 +86,13 @@ class GatherDetails:
         self.session = requests.Session()
         self.session.headers.update(headers)
         self.soup = None
+        self.temps = None
+        self.systemExtras = ""
         self.thermalData = None
+        self.firmware = None
         self.name = None
         self.titleID = None
+        self.searchURL = None
         self.image = None
         self.isRetroGame = False
         self.isInGame = False
@@ -119,8 +137,14 @@ class GatherDetails:
         cpu = re.search(r"CPU(.+?)C", thermalData)
         rsx = re.search(r"RSX(.+?)C", thermalData)
         if cpu and rsx:
-            self.thermalData = f"{cpu.group(0)} | {rsx.group(0)}"
+            self.temps = _THERMAL_RE.sub("", f"{cpu.group(0)} | {rsx.group(0)}")
             _log("Thermals:", _colorize_temps(cpu.group(0), rsx.group(0)))
+            self.systemExtras = self._system_extras()
+            self.thermalData = (
+                f"{self.temps} | {self.systemExtras}"
+                if self.systemExtras
+                else self.temps
+            )
         else:
             from ps3rpc.config import wmanVer
 
@@ -129,9 +153,55 @@ class GatherDetails:
                 f"has webmanMOD been updated since {wmanVer}?"
             )
 
+    def _system_extras(self):
+        """'GPU 500/650 MHz | HDD 76.8 GB free' from the cpursx page."""
+        cfg = self.prep.config
+        if not (cfg.get("show_clocks") or cfg.get("show_hdd_free")):
+            return ""
+        page = self.soup.get_text(" ")
+        parts = []
+        if cfg.get("show_clocks"):
+            clocks = _CLOCKS_RE.search(page)
+            if clocks:
+                parts.append(f"GPU {clocks.group(1)}/{clocks.group(2)} MHz")
+        if cfg.get("show_hdd_free"):
+            hdd = _HDD_RE.search(page)
+            if hdd:
+                parts.append(f"HDD {' '.join(hdd.group(1).split())} free")
+        if parts:
+            _log("System:", " | ".join(parts))
+        return " | ".join(parts)
+
+    def get_session_seconds(self):
+        """Seconds the current game has been running, from webman UI."""
+        label = self.soup.find("label", title="Play")
+        if label is None or label.next_sibling is None:
+            return None
+        match = re.search(r"(\d+):(\d{2}):(\d{2})", str(label.next_sibling))
+        if not match:
+            return None
+        hours, minutes, seconds = (int(part) for part in match.groups())
+        return hours * 3600 + minutes * 60 + seconds
+
+    def get_firmware(self):
+        """PS3 firmware / CFW string, e.g. 'FW 4.93 CEX Cobra 8.5'."""
+        match = _FIRMWARE_RE.search(self.soup.get_text(" "))
+        self.firmware = f"FW {' '.join(match.group(1).split())}" if match else None
+        if self.firmware:
+            _log("Firmware:", self.firmware)
+
+    def build_tooltip(self):
+        """Large-image hover text: temp/clocks/HDD/firmware (per config) + title ID."""
+        temps = self.temps if self.prep.config.get("tooltip_temp") else None
+        parts = [
+            p for p in (temps, self.systemExtras, self.firmware, self.titleID) if p
+        ]
+        return " | ".join(parts)
+
     def decide_game_type(self):
         self.isRetroGame = False
         self.isInGame = False
+        self.searchURL = None
         if self.soup.find("a", target="_blank") is not None:
             _log("Game type:", f"{C.GREEN}PS3 Game or Homebrew{C.RESET}")
             self.isInGame = True
@@ -173,6 +243,7 @@ class GatherDetails:
                     _log("Game:", f"name from search link: {name}")
         self.name = name or titleID
         self.titleID = titleID
+        self.searchURL = _search_url(self.name, self.prep.config["search_url_template"])
         _log(
             "Game:",
             f"{C.GRAY}{titleID}{C.RESET} {C.GRAY}|{C.RESET} "
@@ -183,6 +254,7 @@ class GatherDetails:
             self._prev_title = titleID
 
     def get_retro_details(self):
+        self.titleID = None
         name = "PlayStation 1/2"
         if self.prep.config["retro_covers"]:
             name_tag = self.soup.find("a", href=_PSX_RE) or self.soup.find(
@@ -195,6 +267,8 @@ class GatherDetails:
                     if match:
                         name = match.group(1)
         self.name = name
+        if name != "PlayStation 1/2":
+            self.searchURL = _search_url(name, self.prep.config["search_url_template"])
         _log("Game:", f"{C.WHITE}{C.BOLD}{name}{C.RESET}")
         self.get_retro_image()
 
@@ -231,7 +305,9 @@ class GatherDetails:
         try:
             icon_bytes = _square_pad(icon_bytes)
         except Exception as e:
-            warn(f"Cover: could not square the icon ({type(e).__name__}), uploading as-is")
+            warn(
+                f"Cover: could not square the icon ({type(e).__name__}), uploading as-is"
+            )
 
         try:
             upload = requests.post(

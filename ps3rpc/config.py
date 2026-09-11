@@ -20,16 +20,23 @@ default_config = {
     "client_id": 1512043386327007253,
     "wait_seconds": 30,
     "show_temp": False,
+    "show_clocks": False,
+    "show_hdd_free": False,
     "retro_covers": False,
     "hibernate_seconds": 600,
     "ip_prompt": True,
     "show_timer": True,
+    "accurate_timer": True,
     "prefer_dev_app": False,
     "use_icon0": True,
     "use_appname": False,
     "short_console_name": True,
     "show_only_in_game": True,
-    "temp_on_tooltip": True,
+    "show_tooltip": True,
+    "tooltip_temp": True,
+    "show_firmware": False,
+    "search_button": True,
+    "search_url_template": "https://www.google.com/search?q={query}+PS3",
 }
 
 headers = {"User-Agent": "Mozilla/5.0"}
@@ -41,6 +48,11 @@ _RETRO_LINK_RE = re.compile(r'">(.*)</a>')
 _VERSION_RE = re.compile(r"(.+)\d{2}\.\d{2}")
 _THERMAL_RE = re.compile(r"Â")
 _GOOGLE_SEARCH_RE = re.compile(r"google\.com/search\?q=([^\"&]+)")
+_CLOCKS_RE = re.compile(r"GPU:\s*(\d+)\s*Mhz.*?VRAM:\s*(\d+)\s*Mhz", re.IGNORECASE)
+_HDD_RE = re.compile(r"HDD:\s*([\d.,]+\s*[KMGT]B)\s*free", re.IGNORECASE)
+_FIRMWARE_RE = re.compile(
+    r"Firmware:\s*([0-9.]+\s+[A-Za-z]+(?:\s+Cobra\s+[0-9.]+)?(?:\s+HEN)?)"
+)
 _IPV4_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
 SEPARATOR = "=" * 25 + "\n"
 
@@ -118,21 +130,31 @@ def _arrow_select(prompt, options):
         render()
 
 
-def _toggle_select(prompt, items, values):
-    """Checklist menu"""
+def _toggle_select(prompt, groups, values):
+    """Grouped checklist menu. Category headers render but aren't selectable."""
+    options = [(key, label) for _, items in groups for key, label in items]
+    total_lines = sum(1 + len(items) for _, items in groups) + max(0, len(groups) - 1)
     selected = 0
 
     def render():
-        for i, (key, label) in enumerate(items):
-            box = f"{C.GREEN}[x]{C.RESET}" if values[key] else f"{C.GRAY}[ ]{C.RESET}"
-            if i == selected:
-                sys.stdout.write(f"{C.YELLOW}{C.BOLD}>{C.RESET} {box} {label}\r\n")
-            else:
-                sys.stdout.write(f"  {box} {C.GRAY}{label}{C.RESET}\r\n")
+        idx = 0
+        for group_index, (title, items) in enumerate(groups):
+            if group_index:
+                sys.stdout.write("\r\n")
+            sys.stdout.write(f"{C.BOLD}{C.CYAN}{title}{C.RESET}\r\n")
+            for key, label in items:
+                box = (
+                    f"{C.GREEN}[x]{C.RESET}" if values[key] else f"{C.GRAY}[ ]{C.RESET}"
+                )
+                if idx == selected:
+                    sys.stdout.write(f"{C.YELLOW}{C.BOLD}>{C.RESET} {box} {label}\r\n")
+                else:
+                    sys.stdout.write(f"  {box} {C.GRAY}{label}{C.RESET}\r\n")
+                idx += 1
         sys.stdout.flush()
 
     def move_up():
-        sys.stdout.write(f"\033[{len(items)}A")
+        sys.stdout.write(f"\033[{total_lines}A")
         sys.stdout.flush()
 
     print(prompt)
@@ -140,12 +162,11 @@ def _toggle_select(prompt, items, values):
     while True:
         key = _read_key()
         if key == "up":
-            selected = (selected - 1) % len(items)
+            selected = (selected - 1) % len(options)
         elif key == "down":
-            selected = (selected + 1) % len(items)
+            selected = (selected + 1) % len(options)
         elif key == "space":
-            item_key = items[selected][0]
-            values[item_key] = not values[item_key]
+            values[options[selected][0]] = not values[options[selected][0]]
         elif key == "enter":
             sys.stdout.write("\r\n")
             sys.stdout.flush()
@@ -205,6 +226,8 @@ class PrepWork:
                 self.prompt_user()
                 self.configure_options()
                 return
+            if "show_tooltip" not in self.config and "temp_on_tooltip" in self.config:
+                self.config["show_tooltip"] = self.config.pop("temp_on_tooltip")
             missing = {k: v for k, v in default_config.items() if k not in self.config}
             if missing:
                 self.config.update(missing)
@@ -247,24 +270,70 @@ class PrepWork:
         else:
             self.get_IP_from_user()
 
-    # Options shown on the first-run toggle screen.
-    _TOGGLE_OPTIONS: ClassVar = [
-        ("show_temp", "Show PS3 CPU/RSX temperature in the presence"),
-        ("retro_covers", "Use game-specific covers for PS1/PS2 games"),
-        ("ip_prompt", "Re-prompt for IP if the PS3 can't be reached on startup"),
-        ("show_timer", "Display time elapsed in the presence"),
-        ("prefer_dev_app", "Use Discord dev app images instead of GameTDB covers"),
-        ("use_icon0", "Use the game's own ICON0.PNG instead of GameTDB/dev app covers"),
+    # Boolean options shown on the first-run toggle screen, grouped by category.
+    _OPTION_GROUPS: ClassVar = [
         (
-            "use_appname",
-            "Show game name as the activity details line instead of the app name",
+            "Connection",
+            [
+                ("ip_prompt", "Re-prompt for IP if the PS3 can't be reached on startup"),
+            ],
         ),
-        ("short_console_name", 'Show "PS3" instead of "PlayStation®3 system"'),
         (
-            "show_only_in_game",
-            "Only update presence when a game is running (hide on XMB)",
+            "Elapsed timer",
+            [
+                ("show_timer", "Display time elapsed in the presence"),
+                ("accurate_timer", "Sync the timer to the PS3's in-game play time"),
+            ],
         ),
-        ("temp_on_tooltip", "Show temperature when hovering over the large image"),
+        (
+            "Activity text",
+            [
+                (
+                    "use_appname",
+                    "Show game name as the details line instead of the app name",
+                ),
+                ("short_console_name", 'Show "PS3" instead of "PlayStation®3 system"'),
+                (
+                    "show_only_in_game",
+                    "Only update presence when a game is running (hide on XMB)",
+                ),
+                ("search_button", 'Add a "Search game" button to the activity'),
+            ],
+        ),
+        (
+            "System stats",
+            [
+                (
+                    "show_temp",
+                    "Show CPU/RSX temperature on the activity status line",
+                ),
+                (
+                    "show_tooltip",
+                    "Show a details tooltip when hovering over the large image",
+                ),
+                ("tooltip_temp", "Include CPU/RSX temperature in the tooltip"),
+                (
+                    "show_clocks",
+                    "Include GPU/VRAM clock speeds on the status line / tooltip",
+                ),
+                (
+                    "show_hdd_free",
+                    "Include free HDD space on the status line / tooltip",
+                ),
+                ("show_firmware", "Include the firmware / CFW version in the tooltip"),
+            ],
+        ),
+        (
+            "Cover art",
+            [
+                ("retro_covers", "Use game-specific covers for PS1/PS2 games"),
+                (
+                    "use_icon0",
+                    "Use the game's own ICON0.PNG instead of GameTDB/dev app covers",
+                ),
+                ("prefer_dev_app", "Use Discord dev app images instead of GameTDB covers"),
+            ],
+        ),
     ]
 
     def configure_options(self):
@@ -273,14 +342,15 @@ class PrepWork:
         print(f"\n{C.BOLD}{C.CYAN}===== First-time Setup: Options ====={C.RESET}\n")
         values = {
             key: bool(self.config.get(key, default_config[key]))
-            for key, _ in self._TOGGLE_OPTIONS
+            for _, items in self._OPTION_GROUPS
+            for key, _ in items
         }
         values = _toggle_select(
             f"{C.BOLD}View and toggle any options below, then press enter to continue.{C.RESET}\n"
             f"{C.GRAY}Use arrow keys to navigate, "
             f"{C.WHITE}{C.BOLD}space{C.RESET}{C.GRAY} to toggle, "
             f"{C.WHITE}{C.BOLD}enter{C.RESET}{C.GRAY} to confirm.{C.RESET}\n",
-            self._TOGGLE_OPTIONS,
+            self._OPTION_GROUPS,
             values,
         )
         self.config.update(values)

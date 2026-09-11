@@ -114,17 +114,24 @@ PS3-RPC makes use of an external config file named `ps3rpcconfig.json` to store 
 | `ip` | `""` | Your PS3's IP address |
 | `client_id` | `1512043386327007253` | Discord developer application ID to send presence data to |
 | `wait_seconds` | `30` | How often (in seconds) to refresh presence data (minimum 15) |
-| `show_temp` | `false` | Show PS3 CPU/RSX temperature in the presence |
+| `show_temp` | `false` | Show CPU/RSX temperature on the activity status line (the text row under the game name) |
+| `show_clocks` | `false` | Include GPU/VRAM clock speeds on the status line / tooltip |
+| `show_hdd_free` | `false` | Include free HDD space on the status line / tooltip |
 | `retro_covers` | `false` | Use game-specific covers for PS1/PS2 games |
 | `hibernate_seconds` | `600` | How long (in seconds) to wait before retrying when PS3 is unreachable |
 | `ip_prompt` | `true` | Re-prompt for IP if the PS3 can't be reached on startup |
 | `show_timer` | `true` | Display time elapsed in the presence |
+| `accurate_timer` | `true` | Sync the elapsed timer to the PS3's reported in-game play time instead of when the script started |
 | `prefer_dev_app` | `false` | Use Discord dev app images instead of GameTDB covers |
 | `use_icon0` | `true` | Use the game's own `ICON0.PNG` (fetched from the PS3 and re-hosted on [uguu.se](https://uguu.se)) instead of GameTDB/dev app covers |
 | `use_appname` | `false` | Show game name as the activity details line instead of the app name |
 | `short_console_name` | `true` | Show "PS3" instead of "PlayStation®3 system" in the presence |
 | `show_only_in_game` | `true` | Only update presence when a game is running (hide on XMB) |
-| `temp_on_tooltip` | `true` | Show temperature when hovering over the large image in the activity |
+| `show_tooltip` | `true` | Show a details tooltip when hovering over the large image (contents set by the `tooltip_*` / `show_*` options below, plus the title ID) |
+| `tooltip_temp` | `true` | Include CPU/RSX temperature in the tooltip |
+| `show_firmware` | `false` | Include the firmware / CFW version (e.g. `FW 4.93 CEX Cobra 8.5`) in the tooltip |
+| `search_button` | `true` | Add a "Search game" button linking to a web search for the current game |
+| `search_url_template` | `https://www.google.com/search?q={query}+PS3` | URL for the search button; `{query}` is replaced with the URL-encoded game name |
 
 ### Using your own images
 If you'd like to control what images are used for each game, you must create a Discord Developer Application over at the [Discord Developer Portal](https://discord.com/developers/applications).

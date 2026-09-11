@@ -64,6 +64,9 @@ def main():
 
 def run_loop(prepWork, gatherDetails, timer):
     closed = False
+    show_timer = prepWork.config["show_timer"]
+    accurate_timer = prepWork.config["accurate_timer"]
+    prev_game = None
     while True:
         # this is slow!
         html_ok = gatherDetails.get_html()
@@ -90,23 +93,32 @@ def run_loop(prepWork, gatherDetails, timer):
         else:
             if closed:
                 prepWork.connect_to_discord()
-                timer = int(time())
+                timer = int(time()) if show_timer else None
+                prev_game = None
                 closed = False
 
             gather_buf = io.StringIO()
             with contextlib.redirect_stdout(gather_buf):
-                if prepWork.config["show_temp"] or prepWork.config["temp_on_tooltip"]:
+                if prepWork.config["show_temp"] or prepWork.config["show_tooltip"]:
                     gatherDetails.get_thermals()
-                    if gatherDetails.thermalData:
-                        gatherDetails.thermalData = _THERMAL_RE.sub(
-                            "", gatherDetails.thermalData
-                        )
+                if prepWork.config["show_tooltip"] and prepWork.config["show_firmware"]:
+                    gatherDetails.get_firmware()
 
                 gatherDetails.decide_game_type()
             gathered_output = gather_buf.getvalue()
 
             if gatherDetails.name:
                 gatherDetails.name = _THERMAL_RE.sub("", gatherDetails.name)
+
+            if show_timer:
+                game = gatherDetails.titleID or gatherDetails.name
+                if game != prev_game:
+                    timer = int(time())
+                    if accurate_timer and gatherDetails.isInGame:
+                        session_seconds = gatherDetails.get_session_seconds()
+                        if session_seconds is not None:
+                            timer = int(time()) - session_seconds
+                    prev_game = game
 
             clear()
             _print_header()
@@ -132,8 +144,8 @@ def run_loop(prepWork, gatherDetails, timer):
             else:
                 playing_on = f"On {console} XMB"
 
-            if prepWork.config["temp_on_tooltip"]:
-                large_text = gatherDetails.thermalData or gatherDetails.titleID
+            if prepWork.config["show_tooltip"]:
+                large_text = gatherDetails.build_tooltip() or gatherDetails.titleID
             else:
                 large_text = gatherDetails.titleID
 
@@ -142,6 +154,10 @@ def run_loop(prepWork, gatherDetails, timer):
                 "large_text": large_text,
                 "start": timer,
             }
+            if gatherDetails.searchURL and prepWork.config["search_button"]:
+                rpc_kwargs["buttons"] = [
+                    {"label": "Search game", "url": gatherDetails.searchURL}
+                ]
             temp_line = (
                 gatherDetails.thermalData if prepWork.config["show_temp"] else None
             )
