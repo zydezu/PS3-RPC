@@ -2,7 +2,7 @@ import contextlib
 import io
 from time import sleep, time
 
-from pypresence import InvalidID, InvalidPipe, ServerError
+from pypresence import InvalidID, InvalidPipe, ResponseTimeout, ServerError
 
 from ps3rpc.config import _THERMAL_RE, SEPARATOR, PrepWork
 from ps3rpc.scraper import GatherDetails
@@ -85,8 +85,10 @@ def run_loop(prepWork, gatherDetails, timer):
                     f"PS3 not found on network, closing RPC and hibernating "
                     f"{prepWork.config['hibernate_seconds']} seconds."
                 )
-                if not closed:
-                    prepWork.RPC.clear()
+                # a bridge that never answers clear() (eg endcord with no gateway) would otherwise crash-loop us
+                with contextlib.suppress(ResponseTimeout, InvalidPipe):
+                    if not closed:
+                        prepWork.RPC.clear()
                 prepWork.RPC.close()
                 closed = True
                 sleep(float(prepWork.config["hibernate_seconds"]))
