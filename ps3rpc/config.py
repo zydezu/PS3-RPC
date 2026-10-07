@@ -395,7 +395,6 @@ class PrepWork:
         self.config.update(values)
         self.save_config(self.config["ip"])
         print(SEPARATOR)
-        print(f"Your settings can be found at {self.config_path}")
 
     def grab_host_network(self):
         host_ip = None

@@ -11,8 +11,9 @@ from ps3rpc.ui import C, clear, err, warn
 _EVENT_MARKERS = ("✓", "✗", "⚠")
 
 
-def _print_header():
-    print(f"{C.BOLD}{C.CYAN}PS3-RPC{C.RESET}  {C.GRAY}(Ctrl+C to stop){C.RESET}\n")
+def _print_header(config_path):
+    print(f"{C.BOLD}{C.CYAN}PS3-RPC{C.RESET}  {C.GRAY}(Ctrl+C to stop){C.RESET}")
+    print(f"{C.GRAY}Your settings can be found at {config_path}{C.RESET}\n")
 
 
 def _print_gather_output(captured):
@@ -73,7 +74,7 @@ def run_loop(prepWork, gatherDetails, timer):
 
         if not html_ok:
             clear()
-            _print_header()
+            _print_header(prepWork.config_path)
             if gatherDetails.isRetroGame:
                 print(
                     f"{C.GRAY}PS2 game previously mounted, keeping RPC active and "
@@ -123,7 +124,7 @@ def run_loop(prepWork, gatherDetails, timer):
                     prev_game = game
 
             clear()
-            _print_header()
+            _print_header(prepWork.config_path)
             _print_gather_output(gathered_output)
 
             if prepWork.config["show_only_in_game"] and not gatherDetails.isInGame:
