@@ -86,11 +86,10 @@ def run_loop(prepWork, gatherDetails, timer):
                     f"PS3 not found on network, closing RPC and hibernating "
                     f"{prepWork.config['hibernate_seconds']} seconds."
                 )
-                # a bridge that never answers clear() (eg endcord with no gateway) would otherwise crash-loop us
-                with contextlib.suppress(ResponseTimeout, InvalidPipe):
+                with contextlib.suppress(ResponseTimeout, InvalidPipe, RuntimeError):
                     if not closed:
                         prepWork.RPC.clear()
-                prepWork.RPC.close()
+                    prepWork.RPC.close()
                 closed = True
                 sleep(float(prepWork.config["hibernate_seconds"]))
         else:
@@ -129,8 +128,7 @@ def run_loop(prepWork, gatherDetails, timer):
 
             if prepWork.config["show_only_in_game"] and not gatherDetails.isInGame:
                 print(
-                    f"{C.GRAY}On XMB, skipping RPC update "
-                    f"(show_only_in_game){C.RESET}"
+                    f"{C.GRAY}On XMB, skipping RPC update (show_only_in_game){C.RESET}"
                 )
                 sleep(prepWork.config["wait_seconds"])
                 continue
@@ -157,7 +155,9 @@ def run_loop(prepWork, gatherDetails, timer):
                 if not show_tooltip or prepWork.config["tooltip_game_id"]
                 else None
             )
-            large_text = game_id_text if as_status_line else tooltip_text or game_id_text
+            large_text = (
+                game_id_text if as_status_line else tooltip_text or game_id_text
+            )
             status_extra = tooltip_text if as_status_line else None
 
             rpc_kwargs = {
