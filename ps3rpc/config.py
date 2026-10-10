@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from pypresence import DiscordNotFound, InvalidPipe
 from pypresence.presence import Presence
 
-from ps3rpc.ui import C, clear, err, ok, warn
+from ps3rpc.ui import C, clear, err, ok, require_interactive, warn
 
 default_config = {
     "ip": "",
@@ -279,6 +279,7 @@ class PrepWork:
             self.configure_options()
 
     def prompt_user(self):
+        require_interactive("your PS3's IP address")
         clear()
         print(f"\n{C.BOLD}{C.CYAN}===== PS3-RPC Setup ====={C.RESET}\n")
         options = [
@@ -377,6 +378,7 @@ class PrepWork:
 
     def configure_options(self):
         """Let the user toggle the boolean config options before starting."""
+        require_interactive("setup options")
         clear()
         print(f"\n{C.BOLD}{C.CYAN}===== First-time Setup: Options ====={C.RESET}\n")
         values = {
@@ -442,6 +444,7 @@ class PrepWork:
         self.get_IP_from_user()
 
     def get_IP_from_user(self):
+        require_interactive("your PS3's IP address")
         while True:
             ip = input(
                 f"{C.BOLD}Enter your PS3's IP address{C.RESET} "
