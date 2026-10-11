@@ -55,7 +55,7 @@ def ok(msg: str) -> None:
 
 
 def err(msg: str) -> None:
-    print(f"{C.RED}✗  {msg}{C.RESET}")
+    print(f"{C.MAGENTA}✗  {msg}{C.RESET}")
 
 
 def warn(msg: str) -> None:
